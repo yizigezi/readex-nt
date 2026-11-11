@@ -35,12 +35,18 @@ readex-nt/
 ├── app_icon.png          # 应用图标（当前为占位）
 ├── install.sh            # 构建 + adb 安装
 ├── native/
+│   ├── CMakeLists.txt    # 构建系统（host 单元测试 + 交叉编译设备 .so 两种模式）
 │   ├── fs_plugin.c       # fs 原生模块（QuickJS C 模块，导出 custom_init_jsapis）
-│   └── quickjs/          # QuickJS 2020-07-05 头文件（原生插件编译用）
+│   ├── include/readex/   # 统一错误类型 + 核心接口头（book/decoder/parser/pagination/search 为后续 PR 空壳）
+│   ├── src/core/         # 最小核心（版本/平台信息、冒烟演示，不依赖 QuickJS）
+│   ├── quickjs/          # QuickJS 2020-07-05 头文件 + readex 模块绑定骨架
+│   ├── platform/buildroot/ # armhf 交叉工具链文件
+│   └── tests/            # C++ 单元测试（零依赖 assert 式小框架）
 ├── libs/                 # 原生 .so 插件（随 AMR 打包）
 │   └── libjsapi_fs.so    # fs 插件产物（armhf / hard-float / glibc 2.23）
 ├── tools/
-│   └── build-fs-plugin.sh  # fs 插件编译 + ELF 自检（--check 仅自检）
+│   ├── build-fs-plugin.sh  # fs 插件编译 + ELF 自检（--check 仅自检）
+│   └── build-core.sh       # readex 核心模块编译 + ELF 自检（--check 仅自检）
 └── src/
     ├── app.js            # 应用入口（$falcon.App）
     ├── app.json          # 页面注册
@@ -60,6 +66,90 @@ readex-nt/
 tools/build-fs-plugin.sh          # 编译 + ELF 自检并装入 libs/
 tools/build-fs-plugin.sh --check  # 仅对 libs/libjsapi_fs.so 自检
 ```
+
+## Native Core（原生核心，重构中）
+
+按《Readex Native Core 原生化重构计划》（docs/）分 PR 推进。当前进度：**PR-1（基础设施 + 冒烟 API）**。
+
+### PR-1 冒烟 API
+
+JS 侧 `import Readex from 'readex'`：
+
+| API | 返回 | 说明 |
+|---|---|---|
+| `Readex.version()` | string | 原生核心版本 |
+| `Readex.add(a, b)` | number | 缺参/非数字抛 JS TypeError，message 写明期望与实际类型 |
+| `Readex.info()` | object | `{ version, quickjs, platform, buildMode }` |
+| `Readex.fail()` | 恒抛 JS Error | 演示 C++ 异常 → JS Error 的转换（异常绝不穿过 QuickJS C ABI） |
+
+> **模块名偏差说明**：计划书 §四草案写 `import Readex from '@readex/core'`，
+> 但模块名以宿主 `registerCModuleLoader` 的注册名为准（与 fs 插件同一套 jsapi ABI），
+> 实际注册名为 **`readex`**。
+
+### 构建
+
+**host 单元测试**（g++ 直接编译，或经 CMake）：
+
+```bash
+g++ -std=c++14 -I native/include -I native/tests \
+    native/tests/*.cpp native/src/core/core.cpp -o native/tests/readex_tests
+./native/tests/readex_tests
+
+# 或 CMake：
+cmake -S native -B build-host && cmake --build build-host
+cmake --build build-host --target test   # 或直接跑 build-host/readex_tests
+```
+
+**交叉编译设备 .so**（产出 `libs/libjsapi_readex.so`）：
+
+```bash
+tools/build-core.sh          # 编译 + ELF 自检并装入 libs/（工具链优先 zig c++）
+tools/build-core.sh --check  # 仅自检
+cmake -S native -B build-arm -DCMAKE_TOOLCHAIN_FILE=native/platform/buildroot/toolchain-armhf.cmake
+```
+
+ELF 自检项：Machine=ARM、hard-float（Tag_ABI_VFP_args）、导出 `custom_init_jsapis`、
+NEEDED 只有 libc.so.6（C++ 运行时静态链入）、GLIBC 符号版本 ≤ 2.23。
+
+> **已知偏差（实测）**：C++ 异常运行时（libunwind/libcxxabi）在 glibc ≤2.33 目标上
+> 固有地引用 `__tls_get_addr`（`ld-linux-armhf.so.3`）与 `dl_iterate_phdr`/`dladdr`
+> （`libdl.so.2`），zig 与 gcc 静态链后都无法只留 libc.so.6。两者均为 glibc 基础组件。
+> `tools/build-core.sh --check` 仍按「只有 libc.so.6」严格拦截；确认设备 rootfs
+> 含 `/lib/libdl.so.2` 后用 `--force` 装入。另：Ubuntu 新版交叉 gcc 的静态 libstdc++
+> 会引用 GLIBC_2.3x 新符号，真机必挂，务必用 zig（或 glibc 2.23 sysroot）并过自检。
+
+### host 冒烟宿主（QuickJS 2020-07-05）
+
+`native/tests/host-smoke/` 提供模拟设备 jsapi 加载 ABI 的宿主，可在 PC 上真实跑通
+冒烟 API（dlopen .so → custom_init_jsapis → registerCModuleLoader → `import Readex from 'readex'`）：
+
+```bash
+# 获取与 vendored 头文件同版本的 QuickJS 源码（quickjs.c 不入库）
+curl -LO https://bellard.org/quickjs/quickjs-2020-07-05.tar.xz && tar xf quickjs-2020-07-05.tar.xz
+
+gcc -O2 -rdynamic -DCONFIG_VERSION=\"2020-07-05\" -I quickjs-2020-07-05 \
+    quickjs-2020-07-05/{quickjs,libregexp,libunicode,cutils}.c \
+    native/tests/host-smoke/harness.c -o smoke_host -ldl -lm
+
+# 先编 host 版 .so（把 JS_* 符号留给宿主）
+g++ -std=c++14 -shared -fPIC -fvisibility=hidden -O2 \
+    -I native/quickjs -I native/include \
+    native/quickjs/*.cpp native/src/core/core.cpp -o libjsapi_readex_host.so
+
+./smoke_host ./libjsapi_readex_host.so native/tests/host-smoke/smoke.mjs
+```
+
+### 接口头（后续 PR 空壳）
+
+`native/include/readex/` 下 `book.hpp` / `decoder.hpp` / `parser.hpp` / `pagination.hpp` / `search.hpp`
+只有接口声明与说明，实现按 PR-2…PR-5 逐步落地，不以空实现冒充完成。
+
+### 内存与资源管理规范（PR-1 起生效）
+
+- 可恢复错误一律走 `readex::Result<T>` / `readex::Error`（`native/include/readex/error.hpp`），不把异常当控制流。
+- C++ 异常绝不穿过 QuickJS C ABI：binding 层每个 C 入口统一 `try/catch(...)`，经 `readex::currentExceptionToError()` 转成 JS Error。
+- 文件句柄/原生资源一律 RAII 管理；不把内部指针/对象地址直接暴露给 JS，JS 侧只拿受管理句柄（PR-3 起）。
+- 不一次性把整本书读进内存；大文本用流式/分块接口（PR-2 起）。
 
 ## 许可
 

@@ -35,16 +35,30 @@ readex-nt/
 ├── app_icon.png          # 应用图标（当前为占位）
 ├── install.sh            # 构建 + adb 安装
 ├── native/
+│   ├── fs_plugin.c       # fs 原生模块（QuickJS C 模块，导出 custom_init_jsapis）
 │   └── quickjs/          # QuickJS 2020-07-05 头文件（原生插件编译用）
 ├── libs/                 # 原生 .so 插件（随 AMR 打包）
-├── tools/                # 构建/自检脚本
+│   └── libjsapi_fs.so    # fs 插件产物（armhf / hard-float / glibc 2.23）
+├── tools/
+│   └── build-fs-plugin.sh  # fs 插件编译 + ELF 自检（--check 仅自检）
 └── src/
     ├── app.js            # 应用入口（$falcon.App）
     ├── app.json          # 页面注册
     ├── base-page.js      # 页面基类（资源清理）
     ├── assets/           # 图片资源
     ├── pages/            # 页面
-    └── styles/           # 样式与色板
+    ├── styles/           # 样式与色板
+    └── utils/
+        └── FileSystem/   # fs 兼容适配层（动态 import('fs')，execShell 兜底）
+```
+
+## 原生 fs 插件
+
+部分固件不带 `fs` jsapi，`native/fs_plugin.c` 注册同名 C 模块兜底（Promise 风格 readdir/stat/exists/mkdir/rm/unlink/readFile/writeFile）。JS 侧统一走 `src/utils/FileSystem/FileSystem.js` 动态适配，原生缺失时自动退回 execShell。重新编译：
+
+```bash
+tools/build-fs-plugin.sh          # 编译 + ELF 自检并装入 libs/
+tools/build-fs-plugin.sh --check  # 仅对 libs/libjsapi_fs.so 自检
 ```
 
 ## 许可

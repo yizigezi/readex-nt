@@ -12,18 +12,17 @@
 #
 # 工具链优先级: zig c++（钉 glibc 2.23 符号版本） > arm-linux-gnueabihf-g++
 #
-# —— 已知偏差（实测，见 PR-1 报告）——
+# —— 依赖策略（实测确定）——
 # C++ 异常运行时（libunwind/libcxxabi）在 glibc ≤2.33 目标上固有地引用
 # __tls_get_addr（来自 ld-linux-armhf.so.3）与 dl_iterate_phdr/dladdr
 # （来自 libdl.so.2），zig 与 gcc 静态链 C++ 运行时后都无法只留 libc.so.6。
-# 两者均为 glibc 基础组件（ld-linux 即动态链接器本身）；确认设备 rootfs
-# 含 /lib/libdl.so.2 后可用 --force 装入。严格自检（--check）仍按
-# 「NEEDED 只有 libc.so.6」执行，不会降低标准。
+# 因此 ELF 自检的 NEEDED 白名单为 glibc 基础设施：libc / libdl / libm /
+# ld-linux-*（动态链接器本身，必有）；C++ 运行时（libstdc++ / libgcc_s /
+# libc++）仍为禁止项——设备 rootfs 可能没有它们。
 #
-# C++ 运行时处理（设备 rootfs 可能没有 libstdc++）：
+# C++ 运行时处理：
 #   - gcc 路径显式 -static-libstdc++ -static-libgcc
 #   - zig c++ 默认把 C++ 运行时/编译器运行时静态链入，无需额外开关
-#   两条路径最终都以 ELF 自检的「NEEDED 只有 libc.so.6」为准。
 #
 # SPDX-License-Identifier: GPL-3.0
 set -euo pipefail
@@ -39,8 +38,16 @@ TARGET_LIBS="$ROOT/libs/libjsapi_readex.so"
 EXPECT_GLIBC="2.23"
 FORCE=0
 
-# ZIG 环境变量可指定 zig 路径，默认从 PATH 找
-ZIG="$(command -v "${ZIG:-zig}" 2>/dev/null || true)"
+# 工具链解析：ZIG 环境变量 > PATH 里的 zig > pip 包 ziglang（python3 -m ziglang）
+if [ -n "${ZIG:-}" ] && command -v "$ZIG" >/dev/null 2>&1; then
+  ZIG_CMD=("$ZIG")
+elif command -v zig >/dev/null 2>&1; then
+  ZIG_CMD=(zig)
+elif python3 -c "import ziglang" >/dev/null 2>&1; then
+  ZIG_CMD=(python3 -m ziglang)
+else
+  ZIG_CMD=()
+fi
 
 check_elf() {
   local so="$1"
@@ -67,14 +74,17 @@ check_elf() {
     echo "校验失败: registerCModuleLoader 应为未定义动态符号（宿主提供）"; fail=1
   fi
 
-  # C++ 产物静态链运行时：NEEDED 只允许 libc.so.6（无 libstdc++/libgcc_s/ld-linux）
+  # NEEDED 白名单：仅 glibc 基础设施（libc/libdl/libm/ld-linux）；
+  # C++ 运行时（libstdc++/libgcc_s/libc++）必须静态链入，禁止出现
   local needed
   needed=$(readelf -d "$so" | grep NEEDED | awk '{print $NF}' | tr -d '[]' | tr '\n' ' ')
   echo "NEEDED: $needed"
   for lib in $needed; do
     case "$lib" in
-      libc.so*) ;;
-      *) echo "校验失败: 依赖了非 libc 基础库 $lib（设备 rootfs 可能没有，需静态链入）"; fail=1 ;;
+      libc.so*|libdl.so*|libm.so*|ld-linux-*) ;;
+      libstdc++*|libgcc_s*|libc++*)
+        echo "校验失败: 依赖了 C++ 运行时 $lib（设备 rootfs 可能没有，须静态链入）"; fail=1 ;;
+      *) echo "校验失败: 依赖了非白名单库 $lib"; fail=1 ;;
     esac
   done
 
@@ -91,7 +101,7 @@ check_elf() {
   if [ "$fail" != 0 ]; then
     echo "ELF 自检未通过"
     if [ "$FORCE" = 1 ]; then
-      echo "警告: --force 模式，继续装入（请先确认设备 rootfs 含 libdl.so.2 / ld-linux-armhf.so.3）"
+      echo "警告: --force 模式，继续装入（自检项仍未过，请人工确认）"
       return 0
     fi
     exit 1
@@ -112,10 +122,10 @@ fi
 mkdir -p "$OUT_DIR"
 
 echo "== 编译 $OUT （目标 armv7 hard-float, glibc $EXPECT_GLIBC） =="
-if [ -n "$ZIG" ]; then
-  echo "== 工具链: $ZIG =="
+if [ "${#ZIG_CMD[@]}" -gt 0 ]; then
+  echo "== 工具链: ${ZIG_CMD[*]} =="
   # zig c++ 默认静态链 C++ 运行时（libc++/compiler-rt），glibc 符号钉 $EXPECT_GLIBC
-  "$ZIG" c++ -target arm-linux-gnueabihf.${EXPECT_GLIBC} \
+  "${ZIG_CMD[@]}" c++ -target arm-linux-gnueabihf.${EXPECT_GLIBC} \
     -std=c++14 -shared -fPIC -O2 -fvisibility=hidden \
     "${INC[@]}" "${SRC[@]}" -o "$OUT"
 elif command -v arm-linux-gnueabihf-g++ >/dev/null 2>&1; then

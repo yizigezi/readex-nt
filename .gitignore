@@ -3,3 +3,8 @@ node_modules/
 .falcon_/
 *.amr
 *.log
+# 原生构建产物
+native/dist/
+build-host/
+build-arm/
+native/tests/readex_tests

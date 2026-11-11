@@ -1,21 +1,27 @@
 @import 'md-color.less';
 
-.container {
+// 横屏条形屏毛坯布局（词典笔屏幕为横向长条形）
+// 全部用 vw/vh 相对单位，适配任意条形屏比例，分辨率真机确认后再补精调。
+
+.bar-screen {
     width: 100vw;
     height: 100vh;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    flex-direction: row;
+    align-items: stretch;
     background-color: @surface;
 }
 
-.title {
-    color: @on-surface;
-    font-size: 8vh;
+.entry {
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin: 2vh 1vw;
+    border-radius: 2vh;
+    background-color: @primary-container;
 }
 
-.subtitle {
-    margin-top: 2vh;
-    color: @outline;
-    font-size: 4vh;
+.entry-name {
+    color: @on-primary-container;
+    font-size: 8vh;
 }

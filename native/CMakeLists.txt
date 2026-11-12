@@ -51,6 +51,7 @@ if(READEX_BUILD_QUICKJS_MODULE)
     add_library(jsapi_readex SHARED
         quickjs/module.cpp
         quickjs/bindings.cpp
+        quickjs/book_binding.cpp
     )
     target_include_directories(jsapi_readex PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include

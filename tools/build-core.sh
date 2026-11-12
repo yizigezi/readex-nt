@@ -30,6 +30,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC=( "$ROOT/native/quickjs/module.cpp"
       "$ROOT/native/quickjs/bindings.cpp"
+      "$ROOT/native/quickjs/book_binding.cpp"
       "$ROOT/native/src/core/core.cpp"
       "$ROOT/native/src/reader/reader.cpp"
       "$ROOT/native/src/decoder/decoder.cpp"

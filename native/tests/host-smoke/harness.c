@@ -45,8 +45,10 @@ void registerCModuleLoader(const char* moduleName, LoadCModuleFunction loader)
     }
 }
 
-static JSModuleDef* harness_module_loader(JSContext* ctx, const char* module_name)
+static JSModuleDef* harness_module_loader(JSContext* ctx, const char* module_name,
+                                          void* opaque)
 {
+    (void)opaque;
     for (int i = 0; i < g_loader_count; i++) {
         if (strcmp(g_loaders[i].name, module_name) == 0)
             return g_loaders[i].loader(ctx, module_name);
@@ -86,7 +88,7 @@ static void dump_prop(JSContext* ctx, JSValueConst global, const char* key)
 int main(int argc, char** argv)
 {
     if (argc < 3) {
-        fprintf(stderr, "用法: %s <libjsapi_*.so> <smoke.mjs>\n", argv[0]);
+        fprintf(stderr, "用法: %s <libjsapi_*.so> <smoke.mjs> [book_path]\n", argv[0]);
         return 2;
     }
 
@@ -107,6 +109,14 @@ int main(int argc, char** argv)
     JSRuntime* rt = JS_NewRuntime();
     JSContext* ctx = JS_NewContext(rt);
     JS_SetModuleLoaderFunc(rt, NULL, harness_module_loader, NULL);
+
+    /* 可选第 3 参数作为全局字符串 SMOKE_ARG 传给脚本（如测试书路径） */
+    {
+        JSValue g = JS_GetGlobalObject(ctx);
+        JS_SetPropertyStr(ctx, g, "SMOKE_ARG",
+                          JS_NewString(ctx, argc > 3 ? argv[3] : ""));
+        JS_FreeValue(ctx, g);
+    }
 
     /* 3. 跑冒烟脚本（ES 模块） */
     size_t len = 0;
@@ -132,9 +142,35 @@ int main(int argc, char** argv)
     JSValue global = JS_GetGlobalObject(ctx);
     const char* keys[] = { "r_version", "r_sum", "r_info_version", "r_info_quickjs",
                            "r_info_platform", "r_info_buildmode",
-                           "r_err_missing", "r_err_type", "r_err_fail" };
+                           "r_err_missing", "r_err_type", "r_err_fail",
+                           "r_smoke_ok", "r_smoke_fails",
+                           "r_info", "r_chapters", "r_chapter1", "r_bookerrs",
+                           "r_multi", "r_closeall" };
     for (unsigned i = 0; i < sizeof(keys) / sizeof(keys[0]); i++)
         dump_prop(ctx, global, keys[i]);
+
+    /* 5. PR-3：强制 GC 后验证 class finalizer 清理句柄表
+     *    （脚本里故意丢弃的 Book 对象应被回收，closeAllBooks 只剩显式保留的） */
+    JS_RunGC(rt);
+    static const char kGcCheck[] =
+        "if (globalThis.ReadexApi) "
+        "{ globalThis.r_after_gc = String(ReadexApi.closeAllBooks()); }";
+    JSValue gc_ret = JS_Eval(ctx, kGcCheck, (size_t)strlen(kGcCheck),
+                             "<gc-check>", JS_EVAL_TYPE_GLOBAL);
+    if (JS_IsException(gc_ret)) {
+        JSValue exc = JS_GetException(ctx);
+        const char* s = JS_ToCString(ctx, exc);
+        printf("GC 后检查脚本抛出异常: %s\n", s ? s : "?");
+        JS_FreeCString(ctx, s);
+        JS_FreeValue(ctx, exc);
+        JS_FreeValue(ctx, gc_ret);
+        JS_FreeValue(ctx, global);
+        JS_FreeContext(ctx);
+        JS_FreeRuntime(rt);
+        return 1;
+    }
+    JS_FreeValue(ctx, gc_ret);
+    dump_prop(ctx, global, "r_after_gc");
     JS_FreeValue(ctx, global);
 
     JS_FreeContext(ctx);

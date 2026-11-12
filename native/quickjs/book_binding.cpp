@@ -10,6 +10,12 @@
 //   book.getChapter(i)  -> { title, index, text }   （text 为 UTF-8 字符串）
 //   book.paginateChapter(i, config) -> PageInfo[]   （PR-4 便捷：getChapter +
 //       Readex.paginate，形状与顶层一致；主形状是 Readex.paginate）
+//   book.search(keyword, limit?, options?) -> SearchResult[]（PR-5，见
+//       search_binding.cpp）
+//   book.getProgress() / book.setProgress({chapterIndex, textOffset, pageIndex?})
+//   book.locatePage(pages) / book.addBookmark(...) / book.removeBookmark(i)
+//   book.listBookmarks() / book.serializeState() / book.deserializeState(json)
+//       （PR-5 阅读状态，见 state_binding.cpp）
 //   book.close()        -> undefined（幂等）
 //   Readex.closeAllBooks() -> number（关闭并释放的书数量）
 //
@@ -25,6 +31,7 @@
 #include "quickjs.h"
 
 #include "binding_util.hpp"
+#include "book_handle.hpp"
 
 #include "readex/book.hpp"
 #include "readex/book_registry.hpp"
@@ -37,40 +44,18 @@
 #include <vector>
 
 namespace readex_bind {
-namespace {
 
-// 受管理句柄表（每进程一份；多本书互不串扰）
+// ---- 句柄访问器（book_handle.hpp 声明，供各绑定 TU 复用）----
 readex::BookRegistry& registry()
 {
     static readex::BookRegistry r;
     return r;
 }
 
-// JS Book 对象的 opaque：只存句柄 id（0 = 已关闭/无效），不存 C++ 指针
-struct BookHandle {
-    uint32_t id;
-};
-
 JSClassID& bookClassIdRef()
 {
     static JSClassID id = 0;
     return id;
-}
-
-void book_finalizer(JSRuntime* rt, JSValue val)
-{
-    (void)rt;
-    try {
-        BookHandle* h =
-            static_cast<BookHandle*>(JS_GetOpaque(val, bookClassIdRef()));
-        if (h != nullptr) {
-            if (h->id != 0)
-                registry().release(h->id);
-            delete h;
-        }
-    } catch (...) {
-        // finalizer 在 GC 路径上，绝不让异常穿过 C ABI
-    }
 }
 
 // 取 this_val 的 Book*；非 Book 对象或句柄无效（已关闭）时抛 JS Error 并
@@ -95,6 +80,24 @@ readex::Book* this_book(JSContext* ctx, JSValueConst this_val)
         return nullptr;
     }
     return b;
+}
+
+namespace {
+
+void book_finalizer(JSRuntime* rt, JSValue val)
+{
+    (void)rt;
+    try {
+        BookHandle* h =
+            static_cast<BookHandle*>(JS_GetOpaque(val, bookClassIdRef()));
+        if (h != nullptr) {
+            if (h->id != 0)
+                registry().release(h->id);
+            delete h;
+        }
+    } catch (...) {
+        // finalizer 在 GC 路径上，绝不让异常穿过 C ABI
+    }
 }
 
 } // namespace
@@ -287,6 +290,34 @@ int init_book_binding_impl(JSContext* ctx)
     JS_SetPropertyStr(ctx, proto, "paginateChapter",
                       JS_NewCFunction(ctx, js_book_paginate_chapter,
                                       "paginateChapter", 2));
+    // PR-5：全文搜索（search_binding.cpp）
+    JS_SetPropertyStr(ctx, proto, "search",
+                      JS_NewCFunction(ctx, js_book_search, "search", 3));
+    // PR-5：阅读状态 / 书签 / 序列化（state_binding.cpp）
+    JS_SetPropertyStr(ctx, proto, "getProgress",
+                      JS_NewCFunction(ctx, js_book_get_progress,
+                                      "getProgress", 0));
+    JS_SetPropertyStr(ctx, proto, "setProgress",
+                      JS_NewCFunction(ctx, js_book_set_progress,
+                                      "setProgress", 1));
+    JS_SetPropertyStr(ctx, proto, "locatePage",
+                      JS_NewCFunction(ctx, js_book_locate_page,
+                                      "locatePage", 1));
+    JS_SetPropertyStr(ctx, proto, "addBookmark",
+                      JS_NewCFunction(ctx, js_book_add_bookmark,
+                                      "addBookmark", 1));
+    JS_SetPropertyStr(ctx, proto, "removeBookmark",
+                      JS_NewCFunction(ctx, js_book_remove_bookmark,
+                                      "removeBookmark", 1));
+    JS_SetPropertyStr(ctx, proto, "listBookmarks",
+                      JS_NewCFunction(ctx, js_book_list_bookmarks,
+                                      "listBookmarks", 0));
+    JS_SetPropertyStr(ctx, proto, "serializeState",
+                      JS_NewCFunction(ctx, js_book_serialize_state,
+                                      "serializeState", 0));
+    JS_SetPropertyStr(ctx, proto, "deserializeState",
+                      JS_NewCFunction(ctx, js_book_deserialize_state,
+                                      "deserializeState", 1));
     JS_SetPropertyStr(ctx, proto, "close",
                       JS_NewCFunction(ctx, js_book_close, "close", 0));
     JS_SetClassProto(ctx, id, proto); // 接管 proto 引用

@@ -17,6 +17,7 @@
 #include "readex/error.hpp"
 #include "readex/pagination.hpp"
 
+#include <cmath>
 #include <string>
 #include <vector>
 
@@ -76,6 +77,118 @@ JSValue pages_to_js(JSContext* ctx, const std::vector<readex::PageInfo>& pages);
 // Readex.paginate(content, config) -> PageInfo[]（顶层主形状）
 JSValue js_readex_paginate(JSContext* ctx, JSValueConst this_val, int argc,
                            JSValueConst* argv);
+
+// ---- PR-5 数值/字符串参数工具（search_binding / state_binding 共用）----
+// 校验口径（README 同款）：JS 类型不对 -> TypeError；数值非整数/负数/超范围
+// -> Error code=InvalidArgument；不崩溃、不静默截断。
+
+// JS 数值 -> 非负整数（uint64）。返回 0 成功；-1 异常已挂起。
+// 校验：非负、有限、整数、< 2^64（NaN/inf/小数/负数/超范围 -> InvalidArgument）。
+inline int js_to_uint(JSContext* ctx, JSValueConst v, const char* what,
+                      uint64_t* out)
+{
+    if (!JS_IsNumber(v)) {
+        JS_ThrowTypeError(ctx, "%s 应为数字，实际为 %s", what,
+                          js_type_name(v));
+        return -1;
+    }
+    double d = 0;
+    if (JS_ToFloat64(ctx, &d, v) < 0)
+        return -1;
+    // 2^64 可被 double 精确表示，用 < 2^64 判上界；floor 判整数（NaN 先被
+    // d >= 0 短路掉）
+    if (!(d >= 0.0) || !(d < 18446744073709551616.0) ||
+        d != std::floor(d)) {
+        JS_Throw(ctx, ::readex_bind::make_js_error(
+                          ctx, ::readex::Error(
+                                   ::readex::ErrorCode::InvalidArgument,
+                                   std::string(what) +
+                                       " 须为非负整数且不超 64 位范围")));
+        return -1;
+    }
+    *out = static_cast<uint64_t>(d);
+    return 0;
+}
+
+// 读对象的非负整数字段。返回 1 已填入；0 字段缺省；-1 异常已挂起。
+inline int get_uint_field(JSContext* ctx, JSValueConst obj, const char* name,
+                          uint64_t* out, bool required)
+{
+    JSValue v = JS_GetPropertyStr(ctx, obj, name);
+    if (JS_IsException(v))
+        return -1;
+    if (JS_IsUndefined(v) || JS_IsNull(v)) {
+        JS_FreeValue(ctx, v);
+        if (!required)
+            return 0;
+        JS_Throw(ctx, ::readex_bind::make_js_error(
+                          ctx, ::readex::Error(
+                                   ::readex::ErrorCode::InvalidArgument,
+                                   std::string(name) + " 缺失（必填字段）")));
+        return -1;
+    }
+    if (js_to_uint(ctx, v, name, out) < 0) {
+        JS_FreeValue(ctx, v);
+        return -1;
+    }
+    JS_FreeValue(ctx, v);
+    return 1; // 已填入（js_to_uint 成功返回 0，此处转换为契约值 1）
+}
+
+// 读对象的字符串字段。返回 1 已填入；0 字段缺省；-1 异常已挂起。
+inline int get_string_field(JSContext* ctx, JSValueConst obj, const char* name,
+                            std::string* out, bool required)
+{
+    JSValue v = JS_GetPropertyStr(ctx, obj, name);
+    if (JS_IsException(v))
+        return -1;
+    if (JS_IsUndefined(v) || JS_IsNull(v)) {
+        JS_FreeValue(ctx, v);
+        if (!required)
+            return 0;
+        JS_Throw(ctx, ::readex_bind::make_js_error(
+                          ctx, ::readex::Error(
+                                   ::readex::ErrorCode::InvalidArgument,
+                                   std::string(name) + " 缺失（必填字段）")));
+        return -1;
+    }
+    if (!JS_IsString(v)) {
+        JS_ThrowTypeError(ctx, "%s 应为字符串，实际为 %s", name,
+                          js_type_name(v));
+        JS_FreeValue(ctx, v);
+        return -1;
+    }
+    size_t len = 0;
+    const char* s = JS_ToCStringLen(ctx, &len, v);
+    JS_FreeValue(ctx, v);
+    if (s == nullptr)
+        return -1;
+    out->assign(s, len);
+    JS_FreeCString(ctx, s);
+    return 1;
+}
+
+// ---- 搜索绑定（search_binding.cpp，PR-5）----
+JSValue js_book_search(JSContext* ctx, JSValueConst this_val, int argc,
+                       JSValueConst* argv);
+
+// ---- 阅读状态绑定（state_binding.cpp，PR-5）----
+JSValue js_book_get_progress(JSContext* ctx, JSValueConst this_val, int argc,
+                             JSValueConst* argv);
+JSValue js_book_set_progress(JSContext* ctx, JSValueConst this_val, int argc,
+                             JSValueConst* argv);
+JSValue js_book_locate_page(JSContext* ctx, JSValueConst this_val, int argc,
+                            JSValueConst* argv);
+JSValue js_book_add_bookmark(JSContext* ctx, JSValueConst this_val, int argc,
+                             JSValueConst* argv);
+JSValue js_book_remove_bookmark(JSContext* ctx, JSValueConst this_val, int argc,
+                                JSValueConst* argv);
+JSValue js_book_list_bookmarks(JSContext* ctx, JSValueConst this_val, int argc,
+                               JSValueConst* argv);
+JSValue js_book_serialize_state(JSContext* ctx, JSValueConst this_val, int argc,
+                                JSValueConst* argv);
+JSValue js_book_deserialize_state(JSContext* ctx, JSValueConst this_val,
+                                  int argc, JSValueConst* argv);
 
 } // namespace readex_bind
 

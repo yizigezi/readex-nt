@@ -16,6 +16,10 @@
 //   Readex.closeAllBooks()     -> number（释放数量）
 // PR-4 增补（见 pagination_binding.cpp）：
 //   Readex.paginate(content, config) -> PageInfo[]（分页主形状）
+// PR-5 增补（见 search_binding.cpp / state_binding.cpp，Book 对象方法）：
+//   book.search / book.getProgress / book.setProgress / book.locatePage
+//   book.addBookmark / book.removeBookmark / book.listBookmarks
+//   book.serializeState / book.deserializeState
 //
 // SPDX-License-Identifier: GPL-3.0
 

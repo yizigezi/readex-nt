@@ -30,12 +30,17 @@ else()
 endif()
 
 # ---- 核心静态库（不依赖 QuickJS，可在普通 C++ 测试里独立运行）----
+# reader/decoder 仅用 libc（decoder 的 GBK 走 glibc 内建 iconv，不新增依赖）
 add_library(readex_core STATIC
     src/core/core.cpp
+    src/reader/reader.cpp
 )
 target_include_directories(readex_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
+# 核心会被链进共享库 jsapi_readex：必须 PIC（PR-2 实测 host x86_64 链接报
+# R_X86_64_PC32 … recompile with -fPIC；zig c++ 路径默认 PIC 故未暴露）
+set_target_properties(readex_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # ---- QuickJS 原生模块（设备 .so / host 冒烟均可编译）----
 if(READEX_BUILD_QUICKJS_MODULE)
@@ -73,6 +78,7 @@ if(READEX_BUILD_TESTS)
         tests/test_result.cpp
         tests/test_exception.cpp
         tests/test_core.cpp
+        tests/test_reader.cpp
     )
     target_include_directories(readex_tests PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include

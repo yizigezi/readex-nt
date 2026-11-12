@@ -37,7 +37,7 @@ readex-nt/
 ├── native/
 │   ├── CMakeLists.txt    # 构建系统（host 单元测试 + 交叉编译设备 .so 两种模式）
 │   ├── fs_plugin.c       # fs 原生模块（QuickJS C 模块，导出 custom_init_jsapis）
-│   ├── include/readex/   # 统一错误类型 + 核心接口头（book/decoder/parser/pagination/search 为后续 PR 空壳）
+│   ├── include/readex/   # 统一错误类型 + 核心接口头（book/parser/pagination/search 为后续 PR 空壳，reader/decoder 已落地）
 │   ├── src/core/         # 最小核心（版本/平台信息、冒烟演示，不依赖 QuickJS）
 │   ├── quickjs/          # QuickJS 2020-07-05 头文件 + readex 模块绑定骨架
 │   ├── platform/buildroot/ # armhf 交叉工具链文件
@@ -69,7 +69,7 @@ tools/build-fs-plugin.sh --check  # 仅对 libs/libjsapi_fs.so 自检
 
 ## Native Core（原生核心，重构中）
 
-按《Readex Native Core 原生化重构计划》（docs/）分 PR 推进。当前进度：**PR-1（基础设施 + 冒烟 API）**。
+按《Readex Native Core 原生化重构计划》（docs/）分 PR 推进。当前进度：**PR-2（文本读取与编码模块）已完成**。
 
 ### PR-1 冒烟 API
 
@@ -92,7 +92,8 @@ JS 侧 `import Readex from 'readex'`：
 
 ```bash
 g++ -std=c++14 -I native/include -I native/tests \
-    native/tests/*.cpp native/src/core/core.cpp -o native/tests/readex_tests
+    native/tests/*.cpp native/src/core/*.cpp native/src/reader/*.cpp native/src/decoder/*.cpp \
+    -o native/tests/readex_tests
 ./native/tests/readex_tests
 
 # 或 CMake：
@@ -109,7 +110,8 @@ cmake -S native -B build-arm -DCMAKE_TOOLCHAIN_FILE=native/platform/buildroot/to
 ```
 
 ELF 自检项：Machine=ARM、hard-float（Tag_ABI_VFP_args）、导出 `custom_init_jsapis`、
-NEEDED 只有 libc.so.6（C++ 运行时静态链入）、GLIBC 符号版本 ≤ 2.23。
+NEEDED 只在 glibc 基础库白名单（libc / libdl / libm / ld-linux，C++ 运行时静态链入）、
+GLIBC 符号版本 ≤ 2.23。
 
 > **已知偏差（实测）**：C++ 异常运行时（libunwind/libcxxabi）在 glibc ≤2.33 目标上
 > 固有地引用 `__tls_get_addr`（`ld-linux-armhf.so.3`）与 `dl_iterate_phdr`/`dladdr`
@@ -139,10 +141,41 @@ g++ -std=c++14 -shared -fPIC -fvisibility=hidden -O2 \
 ./smoke_host ./libjsapi_readex_host.so native/tests/host-smoke/smoke.mjs
 ```
 
+### PR-2 文本读取与编码（FileReader + TextDecoder）
+
+两个纯 C++ 模块（不依赖 QuickJS，host 单元测试独立可跑）：
+
+**FileReader**（`native/include/readex/reader.hpp` + `native/src/reader/`）——流式文件读取：
+
+- `open` / `read` / `seek` 返回 `Result<T>`（复用 PR-1 统一错误体系），`tell` / `size` 直接返回值；RAII，析构自动 close，重复 close 安全，不泄漏 fd。
+- 64 位偏移（LFS，`lseek64`），支持大文件分块处理；不提供整读接口，禁止把整本书读进内存。
+- 错误映射：文件不存在→`NotFound`、无权限→`PermissionDenied`、路径是目录/读写失败→`IoError`、未打开句柄上操作→`InvalidArgument`。
+
+**TextDecoder**（`native/include/readex/decoder.hpp` + `native/src/decoder/`）——编码识别与转换：
+
+- 支持 UTF-8 / UTF-8 BOM / UTF-16 LE / UTF-16 BE / GBK（含 GB2312）。
+- **有状态解码器**：`create` / `feed(chunk)` / `finish()`，多字节字符跨块不乱；计划书的一次性
+  `decode(data, len, encoding)` 签名保留为便捷包装（偏差理由：分块需求要求有状态，见 `decoder.hpp` 头注释）。
+- `detect(FileReader&)` 采样文件头尾各 ≤64KiB：BOM → UTF-16 零字节奇偶模式 → UTF-8 合法性 → 兜底 GBK，
+  不只看文件头。已知局限：无 BOM 的纯中文 UTF-16（无零字节线索）无法与 GBK 可靠区分，会兜底 GBK，
+  请优先用带 BOM 的 UTF-16；UTF-32 BOM 明确返回 `Unsupported` 错误。
+
+**非法字节序列策略**（有测试覆盖）：一律替换为 U+FFFD；UTF-8/GBK 每处非法序列前进 1 字节重同步
+（非法序列后的合法字节不被吞掉），UTF-16 孤立代理项同样替换；块末尾未完成序列保留到下一块、
+`finish()` 时补 U+FFFD；中文标点（，。！？「」——…）在任何切分位置不截断。绝不崩溃、不死循环。
+
+**GBK 选型**：GBK→UTF-8 走 glibc 内建 `iconv()`（`libc.so.6` 自带，ELF NEEDED 不变、
+`iconv*@GLIBC_2.4`，天然 ARMv7 / glibc 2.23 兼容，已用 zig 交叉链接验证）。
+已知风险：极简 rootfs 若缺 gconv 模块（`/usr/lib/gconv`），`iconv_open` 会失败——此时
+`create()` 返回 `DecodeError`、一次性 `decode()` 返回空串；真机验证时需确认该目录存在，
+否则回退为内嵌 GBK 码表。UTF-8 / UTF-16 为手写增量转换（零外部依赖）。
+
+**性能探针**（host x86_64，非设备指标）：1.7MiB 混合文本 detect ≈ 2ms；64KiB 块流式读 + GBK 解码 ≈ 55–100MiB/s。
+
 ### 接口头（后续 PR 空壳）
 
-`native/include/readex/` 下 `book.hpp` / `decoder.hpp` / `parser.hpp` / `pagination.hpp` / `search.hpp`
-只有接口声明与说明，实现按 PR-2…PR-5 逐步落地，不以空实现冒充完成。
+`native/include/readex/` 下 `book.hpp` / `parser.hpp` / `pagination.hpp` / `search.hpp`
+只有接口声明与说明（`decoder.hpp` 已于 PR-2 落地），实现按 PR-3…PR-5 逐步落地，不以空实现冒充完成。
 
 ### 内存与资源管理规范（PR-1 起生效）
 

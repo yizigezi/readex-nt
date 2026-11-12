@@ -34,6 +34,7 @@ endif()
 add_library(readex_core STATIC
     src/core/core.cpp
     src/reader/reader.cpp
+    src/decoder/decoder.cpp
 )
 target_include_directories(readex_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -79,6 +80,7 @@ if(READEX_BUILD_TESTS)
         tests/test_exception.cpp
         tests/test_core.cpp
         tests/test_reader.cpp
+        tests/test_decoder.cpp
     )
     target_include_directories(readex_tests PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include

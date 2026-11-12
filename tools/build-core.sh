@@ -31,7 +31,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC=( "$ROOT/native/quickjs/module.cpp"
       "$ROOT/native/quickjs/bindings.cpp"
       "$ROOT/native/src/core/core.cpp"
-      "$ROOT/native/src/reader/reader.cpp" )
+      "$ROOT/native/src/reader/reader.cpp"
+      "$ROOT/native/src/decoder/decoder.cpp" )
 INC=( -I "$ROOT/native/include" -I "$ROOT/native/quickjs" )
 OUT_DIR="$ROOT/native/dist"
 OUT="$OUT_DIR/libjsapi_readex.so"

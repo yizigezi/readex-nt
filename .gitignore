@@ -8,3 +8,5 @@ native/dist/
 build-host/
 build-arm/
 native/tests/readex_tests
+# 测试临时目录（tests/test_support.hpp）
+readex_test_tmp/

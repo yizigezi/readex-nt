@@ -64,7 +64,6 @@ public:
     // 创建有状态解码器。Gbk 依赖系统 iconv，创建失败返回 DecodeError；
     // 其余编码为手写实现，不会失败。Unknown -> InvalidArgument。
     static Result<TextDecoder> create(Encoding encoding);
-
     ~TextDecoder();
     TextDecoder(TextDecoder&& other) noexcept;
     TextDecoder& operator=(TextDecoder&& other) noexcept;
@@ -111,6 +110,10 @@ private:
     bool hasOddByte_;
     bool atStart_;         // 尚未输出任何码点（BOM 剥离判定用）
 };
+
+// 编码英文标识（诊断与 JS 绑定层用）："utf-8" / "utf-8-bom" / "utf-16le" /
+// "utf-16be" / "gbk" / "unknown"。PR-3 增补。
+const char* encodingName(Encoding encoding) noexcept;
 
 } // namespace readex
 

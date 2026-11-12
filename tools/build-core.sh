@@ -32,7 +32,10 @@ SRC=( "$ROOT/native/quickjs/module.cpp"
       "$ROOT/native/quickjs/bindings.cpp"
       "$ROOT/native/src/core/core.cpp"
       "$ROOT/native/src/reader/reader.cpp"
-      "$ROOT/native/src/decoder/decoder.cpp" )
+      "$ROOT/native/src/decoder/decoder.cpp"
+      "$ROOT/native/src/parser/parser.cpp"
+      "$ROOT/native/src/book/book.cpp"
+      "$ROOT/native/src/book/book_registry.cpp" )
 INC=( -I "$ROOT/native/include" -I "$ROOT/native/quickjs" )
 OUT_DIR="$ROOT/native/dist"
 OUT="$OUT_DIR/libjsapi_readex.so"

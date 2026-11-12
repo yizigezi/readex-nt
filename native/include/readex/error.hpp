@@ -25,6 +25,7 @@ namespace readex {
 enum class ErrorCode {
     Ok = 0,
     InvalidArgument, // 参数非法（含 JS 层类型错误下沉）
+    InvalidHandle,   // 句柄/对象已关闭或无效（如 close 后继续访问 Book）
     NotFound,        // 文件/章节/书签不存在
     PermissionDenied,
     IoError,         // 读写失败
@@ -41,6 +42,7 @@ inline const char* errorCodeName(ErrorCode code) noexcept
     switch (code) {
     case ErrorCode::Ok: return "Ok";
     case ErrorCode::InvalidArgument: return "InvalidArgument";
+    case ErrorCode::InvalidHandle: return "InvalidHandle";
     case ErrorCode::NotFound: return "NotFound";
     case ErrorCode::PermissionDenied: return "PermissionDenied";
     case ErrorCode::IoError: return "IoError";

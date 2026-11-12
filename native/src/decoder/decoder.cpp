@@ -202,6 +202,18 @@ Encoding TextDecoder::encoding() const noexcept
     return encoding_;
 }
 
+const char* encodingName(Encoding encoding) noexcept
+{
+    switch (encoding) {
+    case Encoding::Utf8: return "utf-8";
+    case Encoding::Utf8Bom: return "utf-8-bom";
+    case Encoding::Utf16Le: return "utf-16le";
+    case Encoding::Utf16Be: return "utf-16be";
+    case Encoding::Gbk: return "gbk";
+    default: return "unknown";
+    }
+}
+
 Result<TextDecoder> TextDecoder::create(Encoding encoding)
 {
     if (encoding == Encoding::Unknown)

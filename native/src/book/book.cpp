@@ -36,6 +36,7 @@ Book::Book(Book&& other) noexcept
     , info_(std::move(other.info_))
     , chapters_(std::move(other.chapters_))
     , reader_(std::move(other.reader_))
+    , state_(std::move(other.state_))
     , open_(other.open_)
 {
     other.open_ = false;
@@ -50,6 +51,7 @@ Book& Book::operator=(Book&& other) noexcept
     info_ = std::move(other.info_);
     chapters_ = std::move(other.chapters_);
     reader_ = std::move(other.reader_);
+    state_ = std::move(other.state_);
     open_ = other.open_;
     other.open_ = false;
     return *this;

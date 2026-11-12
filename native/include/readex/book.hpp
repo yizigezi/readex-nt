@@ -32,6 +32,7 @@
 #include "readex/error.hpp"
 #include "readex/parser.hpp" // ChapterInfo
 #include "readex/reader.hpp"
+#include "readex/reading_state.hpp" // ReadingStateStore（进度/书签，PR-5）
 
 namespace readex {
 
@@ -60,6 +61,12 @@ public:
     // 内部 seek + 64KiB 分块流式解码，不驻留全书。
     Result<std::string> getChapter(size_t index) const;
 
+    // 阅读状态（PR-5，计划书 §3.7）：进度/书签随 Book 生命周期创建/销毁。
+    // close 后容器里的数据仍在（无害），但 setProgress/addBookmark 等的语义
+    // 校验会经 getChapters 报 InvalidHandle。持久化由 JS 存储层负责。
+    ReadingStateStore& state() noexcept { return state_; }
+    const ReadingStateStore& state() const noexcept { return state_; }
+
     void close() noexcept; // 幂等：重复关闭安全，析构自动调用
     bool isOpen() const noexcept;
 
@@ -71,6 +78,7 @@ private:
     BookInfo info_;
     std::vector<ChapterInfo> chapters_;
     mutable FileReader reader_; // getChapter 为 const，但需 seek/read
+    ReadingStateStore state_;   // 每本书自己的进度/书签（PR-5）
     bool open_ = false;
 };
 

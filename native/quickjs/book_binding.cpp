@@ -8,6 +8,8 @@
 //   book.getInfo()      -> { title, path, sizeBytes, encoding, chapterCount }
 //   book.getChapters()  -> [ { title, index, startOffset, endOffset } ]
 //   book.getChapter(i)  -> { title, index, text }   （text 为 UTF-8 字符串）
+//   book.paginateChapter(i, config) -> PageInfo[]   （PR-4 便捷：getChapter +
+//       Readex.paginate，形状与顶层一致；主形状是 Readex.paginate）
 //   book.close()        -> undefined（幂等）
 //   Readex.closeAllBooks() -> number（关闭并释放的书数量）
 //
@@ -28,6 +30,7 @@
 #include "readex/book_registry.hpp"
 #include "readex/decoder.hpp"
 #include "readex/error.hpp"
+#include "readex/pagination.hpp"
 
 #include <cstdint>
 #include <string>
@@ -197,6 +200,49 @@ JSValue js_book_get_chapter(JSContext* ctx, JSValueConst this_val, int argc,
     READEX_GUARD_END(ctx)
 }
 
+// ---- book.paginateChapter(index, config) -> PageInfo[]（PR-4 便捷）----
+// 内部 = getChapter(index) + PaginationEngine::paginate；偏移指向该章
+// 解码文本（见 pagination.hpp 头注释的偏移语义）。
+JSValue js_book_paginate_chapter(JSContext* ctx, JSValueConst this_val, int argc,
+                                 JSValueConst* argv)
+{
+    READEX_GUARD_BEGIN(ctx)
+    if (argc < 1 || !JS_IsNumber(argv[0]))
+        return JS_ThrowTypeError(
+            ctx,
+            "Book.paginateChapter: 第 1 个参数应为数字（章节索引），实际为 %s",
+            argc < 1 ? "undefined" : js_type_name(argv[0]));
+    int64_t idx = -1;
+    if (JS_ToInt64(ctx, &idx, argv[0]) < 0)
+        return JS_EXCEPTION;
+    if (idx < 0)
+        return JS_ThrowRangeError(
+            ctx, "Book.paginateChapter: 章节索引不能为负数: %lld",
+            static_cast<long long>(idx));
+    if (argc < 2 || !JS_IsObject(argv[1]))
+        return JS_ThrowTypeError(
+            ctx, "Book.paginateChapter: 第 2 个参数应为对象（config），实际为 %s",
+            argc < 2 ? "undefined" : js_type_name(argv[1]));
+
+    readex::PaginationConfig config;
+    if (parse_pagination_config(ctx, argv[1], &config) < 0)
+        return JS_EXCEPTION;
+
+    readex::Book* b = this_book(ctx, this_val);
+    if (b == nullptr)
+        return JS_EXCEPTION;
+    readex::Result<std::string> res = b->getChapter(static_cast<size_t>(idx));
+    if (!res.ok())
+        return JS_Throw(ctx, make_js_error(ctx, res.error()));
+
+    readex::Result<std::vector<readex::PageInfo>> pages =
+        readex::PaginationEngine::paginate(res.value(), config);
+    if (!pages.ok())
+        return JS_Throw(ctx, make_js_error(ctx, pages.error()));
+    return pages_to_js(ctx, pages.value());
+    READEX_GUARD_END(ctx)
+}
+
 // ---- book.close()（幂等）----
 JSValue js_book_close(JSContext* ctx, JSValueConst this_val, int argc,
                       JSValueConst* argv)
@@ -238,6 +284,9 @@ int init_book_binding_impl(JSContext* ctx)
                       JS_NewCFunction(ctx, js_book_get_chapters, "getChapters", 0));
     JS_SetPropertyStr(ctx, proto, "getChapter",
                       JS_NewCFunction(ctx, js_book_get_chapter, "getChapter", 1));
+    JS_SetPropertyStr(ctx, proto, "paginateChapter",
+                      JS_NewCFunction(ctx, js_book_paginate_chapter,
+                                      "paginateChapter", 2));
     JS_SetPropertyStr(ctx, proto, "close",
                       JS_NewCFunction(ctx, js_book_close, "close", 0));
     JS_SetClassProto(ctx, id, proto); // 接管 proto 引用

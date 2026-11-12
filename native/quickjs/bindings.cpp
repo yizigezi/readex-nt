@@ -14,6 +14,8 @@
 // PR-3 增补（见 book_binding.cpp）：
 //   Readex.openBook(path)      -> Book 对象（getInfo/getChapters/getChapter/close）
 //   Readex.closeAllBooks()     -> number（释放数量）
+// PR-4 增补（见 pagination_binding.cpp）：
+//   Readex.paginate(content, config) -> PageInfo[]（分页主形状）
 //
 // SPDX-License-Identifier: GPL-3.0
 
@@ -129,6 +131,10 @@ JSValue readex_new_api_object(JSContext* ctx)
         JS_SetPropertyStr(ctx, api, "closeAllBooks",
                           JS_NewCFunction(ctx, ::readex_bind::js_close_all_books,
                                           "closeAllBooks", 0));
+        // PR-4：分页引擎（顶层主形状）
+        JS_SetPropertyStr(ctx, api, "paginate",
+                          JS_NewCFunction(ctx, ::readex_bind::js_readex_paginate,
+                                          "paginate", 2));
         return api;
     } catch (...) {
         return JS_Throw(ctx, make_js_error(ctx, readex::currentExceptionToError()));

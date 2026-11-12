@@ -145,7 +145,8 @@ int main(int argc, char** argv)
                            "r_err_missing", "r_err_type", "r_err_fail",
                            "r_smoke_ok", "r_smoke_fails",
                            "r_info", "r_chapters", "r_chapter1", "r_bookerrs",
-                           "r_multi", "r_closeall" };
+                           "r_multi", "r_closeall",
+                           "r_ascii", "r_cn", "r_punct", "r_cfg", "r_chpages" };
     for (unsigned i = 0; i < sizeof(keys) / sizeof(keys[0]); i++)
         dump_prop(ctx, global, keys[i]);
 

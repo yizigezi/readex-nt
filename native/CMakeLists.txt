@@ -53,6 +53,7 @@ if(READEX_BUILD_QUICKJS_MODULE)
         quickjs/module.cpp
         quickjs/bindings.cpp
         quickjs/book_binding.cpp
+        quickjs/pagination_binding.cpp
     )
     target_include_directories(jsapi_readex PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include

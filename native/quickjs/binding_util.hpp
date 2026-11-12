@@ -15,8 +15,10 @@
 #include "quickjs.h"
 
 #include "readex/error.hpp"
+#include "readex/pagination.hpp"
 
 #include <string>
+#include <vector>
 
 namespace readex_bind {
 
@@ -59,6 +61,20 @@ int init_book_binding(JSContext* ctx);
 JSValue js_open_book(JSContext* ctx, JSValueConst this_val, int argc,
                      JSValueConst* argv);
 JSValue js_close_all_books(JSContext* ctx, JSValueConst this_val, int argc,
+                           JSValueConst* argv);
+
+// ---- 分页绑定（pagination_binding.cpp，PR-4）----
+// 解析 JS config 对象 -> PaginationConfig。返回 0 成功；-1 时 JS 异常已挂起。
+// 校验策略（README 同款）：config 必须是对象（否则 TypeError）；width/height
+// 必填（缺失 -> Error code=InvalidArgument）；其余字段缺省用默认值；字段类型
+// 不是数字 -> TypeError；数值合法性由核心 validatePaginationConfig 统一判
+// （-> Error code=InvalidArgument）；未知字段忽略。
+int parse_pagination_config(JSContext* ctx, JSValueConst cfg,
+                            readex::PaginationConfig* out);
+// 把分页结果包装成 JS 数组 [{startOffset, endOffset, pageIndex}]
+JSValue pages_to_js(JSContext* ctx, const std::vector<readex::PageInfo>& pages);
+// Readex.paginate(content, config) -> PageInfo[]（顶层主形状）
+JSValue js_readex_paginate(JSContext* ctx, JSValueConst this_val, int argc,
                            JSValueConst* argv);
 
 } // namespace readex_bind

@@ -37,10 +37,11 @@ readex-nt/
 ├── native/
 │   ├── CMakeLists.txt    # 构建系统（host 单元测试 + 交叉编译设备 .so 两种模式）
 │   ├── fs_plugin.c       # fs 原生模块（QuickJS C 模块，导出 custom_init_jsapis）
-│   ├── include/readex/   # 统一错误类型 + 核心接口头（pagination/search 为后续 PR 空壳，reader/decoder/book/parser 已落地）
+│   ├── include/readex/   # 统一错误类型 + 核心接口头（search 为 PR-5 空壳，reader/decoder/book/parser/pagination 已落地）
 │   ├── src/core/         # 最小核心（版本/平台信息、冒烟演示，不依赖 QuickJS）
 │   ├── src/book/         # Book Manager + 受管理句柄表（PR-3）
 │   ├── src/parser/       # 章节解析：规则表 + 标题匹配 + 字节偏移扫描（PR-3）
+│   ├── src/pagination/   # 分页引擎 + 估算测量模型（PR-4）
 │   ├── quickjs/          # QuickJS 2020-07-05 头文件 + readex 模块绑定（含 Book 对象绑定）
 │   ├── platform/buildroot/ # armhf 交叉工具链文件
 │   └── tests/            # C++ 单元测试（零依赖 assert 式小框架）
@@ -117,9 +118,9 @@ GLIBC 符号版本 ≤ 2.23。
 
 > **已知偏差（实测）**：C++ 异常运行时（libunwind/libcxxabi）在 glibc ≤2.33 目标上
 > 固有地引用 `__tls_get_addr`（`ld-linux-armhf.so.3`）与 `dl_iterate_phdr`/`dladdr`
-> （`libdl.so.2`），zig 与 gcc 静态链后都无法只留 libc.so.6。两者均为 glibc 基础组件。
-> `tools/build-core.sh --check` 仍按「只有 libc.so.6」严格拦截；确认设备 rootfs
-> 含 `/lib/libdl.so.2` 后用 `--force` 装入。另：Ubuntu 新版交叉 gcc 的静态 libstdc++
+> （`libdl.so.2`），zig 与 gcc 静态链后都无法只留 libc.so.6。两者均为 glibc 基础组件，
+> 自检白名单已据此放行（libc / libdl / libm / ld-linux），C++ 运行时仍为禁止项。
+> 另：Ubuntu 新版交叉 gcc 的静态 libstdc++
 > 会引用 GLIBC_2.3x 新符号，真机必挂，务必用 zig（或 glibc 2.23 sysroot）并过自检。
 
 ### host 冒烟宿主（QuickJS 2020-07-05）
@@ -138,11 +139,12 @@ gcc -O2 -rdynamic -DCONFIG_VERSION=\"2020-07-05\" -I quickjs-2020-07-05 \
 # 先编 host 版 .so（把 JS_* 符号留给宿主）
 g++ -std=c++14 -shared -fPIC -fvisibility=hidden -O2 \
     -I native/quickjs -I native/include \
-    native/quickjs/*.cpp native/src/{core,reader,decoder,parser,book}/*.cpp \
+    native/quickjs/*.cpp native/src/{core,reader,decoder,parser,book,pagination}/*.cpp \
     -o libjsapi_readex_host.so
 
 ./smoke_host ./libjsapi_readex_host.so native/tests/host-smoke/smoke.mjs
 ./smoke_host ./libjsapi_readex_host.so native/tests/host-smoke/smoke_pr3.mjs <测试书txt>
+./smoke_host ./libjsapi_readex_host.so native/tests/host-smoke/smoke_pr4.mjs <测试书txt>
 ```
 
 ### PR-2 文本读取与编码（FileReader + TextDecoder）
@@ -224,11 +226,84 @@ Book 全生命周期、章节内容/偏移、错误码（NotFound/InvalidHandle/
 多书并行、closeAllBooks 与 GC finalizer 清理；另跑 `smoke.mjs` 确认 PR-1 冒烟 API 无回归。
 设备真机验证待 PR-4 一并进行。
 
+### PR-4 分页引擎（Pagination Engine + 测量解耦 + QuickJS 绑定 + Vue 毛坯接线）
+
+纯 C++ 部分（`pagination.hpp` + `src/pagination/`）不依赖 QuickJS，host 单测独立可跑；
+绑定层（`quickjs/pagination_binding.cpp`）只做参数校验与结果包装。
+
+**偏移语义（PR-5 依赖的关键约定）**：`PageInfo.startOffset / endOffset` 是「传入
+content 字符串内的**解码文本偏移**」——即 UTF-8 字节偏移，指向 `paginate()` 收到的
+那串已解码章文本，**不是**原始文件字节偏移（文件偏移是 ChapterInfo 的语义）。
+恒满足：半开区间 `[start, end)`、恒在码点边界、各页区间首尾相接无缝无重（逐页
+substr 拼接 == 原文，不丢字、不重复）、`pageIndex` 从 0 递增；空文本返回单个
+空页 `[0, 0)`（UI 总有页可显示）。PR-5 的 ReadingState 将存 `chapterIndex +
+textOffset`，其中 `textOffset` 沿用本约定；全文搜索返回的匹配偏移同样复用。
+JS 侧注意：JS 字符串下标 ≠ UTF-8 字节偏移（中文 1 字 = 3 字节），按偏移切片
+需自行换算（`src/pages/reader/index.vue` 有换算示例）。
+
+**JS API 形状**（`import Readex from 'readex'`；主形状是顶层 `Readex.paginate`）：
+
+| API | 返回 | 说明 |
+|---|---|---|
+| `Readex.paginate(content, config)` | array | **主形状**：`[{ startOffset, endOffset, pageIndex }]`；content 为一章的已解码文本（UTF-8 字符串） |
+| `book.paginateChapter(i, config)` | array | 便捷方法（内部 getChapter + paginate），结果与顶层逐字节一致；close 后调用报 `InvalidHandle` |
+
+**config 字段与校验策略**（host 冒烟已测到）：`width`/`height` 必填（**可用阅读区域
+由 UI 显式传入**，引擎不假设屏幕比例/工具栏宽度——这是修「内容挤在屏幕左侧」的
+关键）；其余字段缺省用默认值，未知字段忽略；字段存在但不是数字 → `TypeError`；
+数值非法（≤0、NaN、inf、边距吃光可用区等）→ `Error code=InvalidArgument`
+（核心 `validatePaginationConfig` 统一判）；缺必填字段 → `Error code=InvalidArgument`。
+
+| 字段 | 默认 | 说明 |
+|---|---|---|
+| `width` / `height` | （必填） | 可用阅读区域像素宽高 |
+| `fontSize` | 20 | 字号（px） |
+| `lineHeight` | 1.5 | 行高倍数（行高 = fontSize × lineHeight） |
+| `letterSpacing` | 0 | 每字后附加 px（与 CSS letter-spacing 一致，行末也计） |
+| `paragraphSpacing` | 0 | 段落（硬换行）间附加 px；不跨页（新页页顶不补） |
+| `paddingTop/Bottom/Left/Right` | 0 | 四边边距 px |
+| `asciiWidthEm` | 0.5 | ASCII/半角 em 系数 |
+| `cjkWidthEm` | 1.0 | CJK 全角 em 系数 |
+| `punctuationWidthEm` | 1.0 | 中文标点（1.0=全宽，0.5=半宽，可配） |
+
+**字体测量解耦**：分页算法只依赖 `TextMeasurer` 抽象（码点 → 字形宽度），第一阶段
+用 `EstimatingMeasurer`（可配置估算模型：CJK 全宽 / ASCII 半宽 / 标点全宽或半宽可配，
+参数如上表后三行）。**明确局限**：估算宽度与真机字体渲染存在误差（0.5em/1em 是经验
+系数，真机字体 advance 可能偏离）；不建模 kerning/连字/基线。真机若能提供字体测量
+接口，实现 `TextMeasurer` 后走 `paginate(content, config, measurer)` 重载注入，分页
+算法无需改动（C++ 层 API；JS 侧暂不暴露自定义测量器）。
+
+**换行规则（基础版）**：只在合法断点软换行——句号逗号等收尾标点（，。！？；：、）」』…——）
+不落行首、引号括号（「『（【《）不落行尾（靠超宽时向后回溯到最后合法断点实现）、
+英文词内不断、成对连字（—— ……）中间不断、空白之后才断。**明确局限**（不崩、稳定、
+但不完美）：行内无合法断点时强制断行（超长英文单词被机械切开）或把行首禁则字悬挂
+在行尾（最多 1 字）；连续禁则字符（如「…………」）在极窄行宽下仍可能落行首；不做
+悬挂标点/断词/两端对齐；`\t` 按 4 个半角空格宽估；非法 UTF-8 字节按 1 字节 1 字符
+处理。其余边界：单字超宽独占一行（允许溢出）、每页至少 1 行（保证推进）、纯空白/
+CRLF/超长行/极大文本不崩。
+
+**Vue 毛坯接线**（`src/pages/reader/index.vue`）：阅读区宽高由 Vue 层显式传入——
+falcon 暂无布局测量 API，毛坯先用「屏幕常量 × 布局占比」换算 px 并在注释写明
+**「真机尺寸数据到位后校准」**；`Readex.paginate` 走动态 `import('readex')`（PC 构建
+降级不白屏）。**不声称真机效果**：内容「不再挤在左侧」的真机验收由主人在 X5 上做。
+
+**测试证据**（host x86_64）：`test_pagination.cpp` 21 个用例（全仓 108 个用例全绿，
+含 PR-1…PR-3 回归）：黄金切分（句号不落行首/引号不落行尾/词内不断/字距/段距/边距）、
+稳定性（同输入两次逐字段一致）、无缝拼接性质（伪随机中英混排 × 多配置，逐页 substr
+拼接 == 原文 + 偏移恒在码点边界）、空/纯空白/CRLF/超长行/单字超宽/病态标点行、
+配置边界（宽高 0/负/NaN/inf、字号 0、字距负、边距吃光可用区等均报 `InvalidArgument`）、
+重新分页、估算参数（标点全宽 vs 半宽改变切分）、自定义测量器注入、分类/换行性质表；
+ASan+UBSan 全绿；绑定层 host 冒烟（`smoke_pr4.mjs`，QuickJS 2020-07-05 真实运行）覆盖
+两形状一致性、拼接性质（含 UTF-8 字节偏移 ↔ JS 下标换算）、避头尾黄金、配置校验策略、
+NotFound/InvalidHandle/TypeError/RangeError 路径。大文本探针（记录用，非指标）：约
+78 万字节中英混排（30 万字量级）单次分页 ≈ 26 ms（-O2）/ 70 ms（ASan）。设备真机
+验证（含内容不再挤在左侧）待主人在 X5 验收。
+
 ### 接口头（后续 PR 空壳）
 
-`native/include/readex/` 下 `pagination.hpp` / `search.hpp` 仍只有接口声明与说明
-（`book.hpp` / `parser.hpp` 已于 PR-3 落地，`decoder.hpp` / `reader.hpp` 为 PR-2），
-实现按 PR-4…PR-5 逐步落地，不以空实现冒充完成。
+`native/include/readex/` 下仅 `search.hpp` 仍只有接口声明与说明（PR-5 落地；
+`pagination.hpp` 已于 PR-4 落地，`book.hpp` / `parser.hpp` 为 PR-3，`decoder.hpp` /
+`reader.hpp` 为 PR-2），不以空实现冒充完成。
 
 ### 内存与资源管理规范（PR-1 起生效）
 

@@ -37,11 +37,13 @@ readex-nt/
 ├── native/
 │   ├── CMakeLists.txt    # 构建系统（host 单元测试 + 交叉编译设备 .so 两种模式）
 │   ├── fs_plugin.c       # fs 原生模块（QuickJS C 模块，导出 custom_init_jsapis）
-│   ├── include/readex/   # 统一错误类型 + 核心接口头（search 为 PR-5 空壳，reader/decoder/book/parser/pagination 已落地）
+│   ├── include/readex/   # 统一错误类型 + 核心接口头（reader/decoder/book/parser/pagination/search/reading_state 全部落地）
 │   ├── src/core/         # 最小核心（版本/平台信息、冒烟演示，不依赖 QuickJS）
-│   ├── src/book/         # Book Manager + 受管理句柄表（PR-3）
+│   ├── src/book/         # Book Manager + 受管理句柄表（PR-3，Book 持有 ReadingStateStore）
 │   ├── src/parser/       # 章节解析：规则表 + 标题匹配 + 字节偏移扫描（PR-3）
 │   ├── src/pagination/   # 分页引擎 + 估算测量模型（PR-4）
+│   ├── src/search/       # 全文搜索（PR-5，朴素字符串搜索）
+│   ├── src/state/        # 阅读状态：进度/书签/JSON 序列化（PR-5）
 │   ├── quickjs/          # QuickJS 2020-07-05 头文件 + readex 模块绑定（含 Book 对象绑定）
 │   ├── platform/buildroot/ # armhf 交叉工具链文件
 │   └── tests/            # C++ 单元测试（零依赖 assert 式小框架）
@@ -72,7 +74,7 @@ tools/build-fs-plugin.sh --check  # 仅对 libs/libjsapi_fs.so 自检
 
 ## Native Core（原生核心，重构中）
 
-按《Readex Native Core 原生化重构计划》（docs/）分 PR 推进。当前进度：**PR-3（书籍与章节管理）已完成**（PR-4 分页 / PR-5 搜索与阅读状态未动）。
+按《Readex Native Core 原生化重构计划》（docs/）分 PR 推进。当前进度：**PR-5（搜索 / 阅读状态 / 书签）已完成**（PR-6 Vue 层清理未动）。
 
 ### PR-1 冒烟 API
 
@@ -139,12 +141,13 @@ gcc -O2 -rdynamic -DCONFIG_VERSION=\"2020-07-05\" -I quickjs-2020-07-05 \
 # 先编 host 版 .so（把 JS_* 符号留给宿主）
 g++ -std=c++14 -shared -fPIC -fvisibility=hidden -O2 \
     -I native/quickjs -I native/include \
-    native/quickjs/*.cpp native/src/{core,reader,decoder,parser,book,pagination}/*.cpp \
+    native/quickjs/*.cpp native/src/{core,reader,decoder,parser,book,pagination,search,state}/*.cpp \
     -o libjsapi_readex_host.so
 
 ./smoke_host ./libjsapi_readex_host.so native/tests/host-smoke/smoke.mjs
 ./smoke_host ./libjsapi_readex_host.so native/tests/host-smoke/smoke_pr3.mjs <测试书txt>
 ./smoke_host ./libjsapi_readex_host.so native/tests/host-smoke/smoke_pr4.mjs <测试书txt>
+./smoke_host ./libjsapi_readex_host.so native/tests/host-smoke/smoke_pr5.mjs <测试书txt>
 ```
 
 ### PR-2 文本读取与编码（FileReader + TextDecoder）
@@ -299,11 +302,83 @@ NotFound/InvalidHandle/TypeError/RangeError 路径。大文本探针（记录用
 78 万字节中英混排（30 万字量级）单次分页 ≈ 26 ms（-O2）/ 70 ms（ASan）。设备真机
 验证（含内容不再挤在左侧）待主人在 X5 验收。
 
-### 接口头（后续 PR 空壳）
+### PR-5 全文搜索与阅读状态（Search Engine + Reading State + 书签）
 
-`native/include/readex/` 下仅 `search.hpp` 仍只有接口声明与说明（PR-5 落地；
-`pagination.hpp` 已于 PR-4 落地，`book.hpp` / `parser.hpp` 为 PR-3，`decoder.hpp` /
-`reader.hpp` 为 PR-2），不以空实现冒充完成。
+纯 C++ 部分（`search.hpp` + `src/search/`、`reading_state.hpp` + `src/state/`）不依赖
+QuickJS，host 单测独立可跑；绑定层（`quickjs/search_binding.cpp` / `quickjs/state_binding.cpp`）
+只做参数校验与结果包装。
+
+**偏移语义（三模块同一把尺子）**：`SearchResult.offset`、`ReadingState.textOffset`、
+`Bookmark.textOffset` 都是「章节**已解码文本**（UTF-8）内的字节偏移」，恒落在码点
+边界——与 `PageInfo.startOffset/endOffset` 完全同语义（见 PR-4 小节），可直接与页
+区间比对定位所在页；**不是**原始文件字节偏移（那是 `ChapterInfo.startOffset/
+endOffset` 的语义）。`textOffset` 是阅读位置的**唯一事实源**，`pageIndex` 是按当前
+分页配置算出的派生缓存。
+
+**搜索（第一阶段朴素字符串搜索，不做索引）**：关键词按字节子串匹配（有效 UTF-8
+关键词的匹配必然起止于码点边界，UTF-8 自同步性）；匹配互不重叠、每章内从左到右、
+跨章按章节顺序、命中 limit 即停（分章 + 限流保证同步 API 工作量有界）；无匹配返回
+空数组（不是错误）；空关键词 / limit<=0 -> `Error code=InvalidArgument`。context
+（前后文摘录）默认前后各 32 字节（可配，0 = 该侧不取），预算边界吸附到码点边界
+（绝不切开多字节字符），文本首尾自然截断，是纯原文子串（无省略号等附加符号）。
+
+**JS API 形状**（Book 对象方法）：
+
+| API | 返回 | 说明 |
+|---|---|---|
+| `book.search(keyword, limit?, options?)` | array | `[{chapterIndex, offset, context}]`；limit 缺省 100（正整数限流）；options = `{contextBefore?, contextAfter?}`（字节预算，缺省各 32） |
+| `book.getProgress()` | object | `{chapterIndex, pageIndex, textOffset}` |
+| `book.setProgress({chapterIndex, textOffset, pageIndex?})` | object | 同上（生效值）；pageIndex 缺省时同章沿用旧值、换章归 0；章节越界/偏移越出章文本/不在码点边界 -> `InvalidArgument` |
+| `book.locatePage(pages)` | number | pages = PageInfo[]（形状同 paginateChapter 输出）；用页区间反查当前 textOffset 所在页并写回 pageIndex。**换分页配置后恢复位置 = 重新 paginateChapter + locatePage**；空数组/偏移不在页内 -> `InvalidArgument` |
+| `book.addBookmark({chapterIndex, textOffset, note?, createdAt?})` | number | 新书签下标（从 0 起）；位置校验同 setProgress；note/createdAt 是自由文本（createdAt 由 JS 层填，原生只存不解释） |
+| `book.removeBookmark(index)` | object | 返回被删书签 `{chapterIndex, textOffset, note, createdAt}`；下标越界 -> `NotFound` |
+| `book.listBookmarks()` | array | 书签数组（加入顺序） |
+| `book.serializeState()` | string | JSON（version 1，格式见下；**持久化由 JS 存储层负责**，原生只出/入字符串） |
+| `book.deserializeState(json)` | undefined | 结构非法 -> `ParseError`；载入前对进度与每个书签做语义复核，非法 -> `InvalidArgument`；两种失败都保持原状态 |
+
+**序列化格式（version 1，定一种）**：
+
+```json
+{
+  "version": 1,
+  "progress": { "chapterIndex": 0, "pageIndex": 0, "textOffset": 0 },
+  "bookmarks": [
+    { "chapterIndex": 0, "textOffset": 0, "note": "", "createdAt": "" }
+  ]
+}
+```
+
+- 数字均为非负整数（十进制，无小数/指数；解析直接进 uint64，不受 JS Number 2^53
+  限制；size_t 字段超平台范围判非法）；字符串按标准 JSON 转义（`\uXXXX` 含代理对），
+  UTF-8 原样保留；
+- 解析器是手写的最小严格解析器（零依赖）：结构/类型非法 -> `ParseError`，`version`
+  缺失或不认识 -> `ParseError`，未知字段忽略（向前兼容），对象后多余内容 ->
+  `ParseError`；**非法输入不崩**，失败时原状态保持不变（21 种非法载荷有测试）；
+- `deserializeState` 只恢复数据；语义复核（章节存在、偏移在章内且在码点边界）由
+  `setProgress`/`addBookmark` 与绑定层加载时做（`validateStateLocation`）。
+
+**校验口径**（与分页绑定一致）：JS 类型不对 -> `TypeError`；数值非法（非整数/负数/
+NaN/超范围）-> `Error code=InvalidArgument`；close 后调用 -> `InvalidHandle`。
+
+**测试证据**（host x86_64）：`test_search.cpp` 10 个用例 + `test_reading_state.cpp` 9 个
+用例，全仓 **127 个用例全绿、0 失败**（含 PR-1…PR-4 回归）：中/英关键词精确偏移、
+多匹配、limit 截断、无匹配、非重叠语义（「aa」在「aaaa」里 0/2）、context 首尾截断
+与码点吸附（预算不足一个汉字时退/进到字符边界）、context 可配（0/超长）、整书多章
+搜索（章节归属/跨章 limit/close 后 InvalidHandle）、进度保存/恢复、无效偏移/章节号
+错误码（越界/越出章文本/码点中间 -> InvalidArgument）、偏移↔页映射逐码点遍历一致、
+文末光标归末页、换分页配置后按 textOffset 恢复到新页、书签增删列表、序列化
+round-trip（含中文/转义/emoji）、21 种非法 JSON 不崩且原状态不变、未知字段忽略；
+ASan+UBSan 全绿（无任何 sanitizer 报告）；绑定层 host 冒烟（`smoke_pr5.mjs`，QuickJS
+2020-07-05 真实运行）覆盖 search/进度/locatePage/书签/序列化全部路径与错误码
+（TypeError/InvalidArgument/NotFound/ParseError/InvalidHandle）。大文本耗时探针（记录用，
+非指标）：约 1MiB 中英混排全量无匹配扫描 ≈ 0.02–0.05 ms、1.7 万处匹配全量收集
+≈ 1.7 ms（-O2）/ 7.2 ms（ASan）。设备真机验证待主人在 X5 验收。
+
+### 接口头（后续 PR）
+
+`native/include/readex/` 下接口头已全部落地（`search.hpp` / `reading_state.hpp` 于 PR-5
+落地，`pagination.hpp` 为 PR-4，`book.hpp` / `parser.hpp` 为 PR-3，`decoder.hpp` /
+`reader.hpp` 为 PR-2），不以空实现冒充完成；后续 PR-6（Vue 层清理）不再新增核心接口头。
 
 ### 内存与资源管理规范（PR-1 起生效）
 

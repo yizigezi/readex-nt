@@ -37,9 +37,11 @@ readex-nt/
 ├── native/
 │   ├── CMakeLists.txt    # 构建系统（host 单元测试 + 交叉编译设备 .so 两种模式）
 │   ├── fs_plugin.c       # fs 原生模块（QuickJS C 模块，导出 custom_init_jsapis）
-│   ├── include/readex/   # 统一错误类型 + 核心接口头（book/parser/pagination/search 为后续 PR 空壳，reader/decoder 已落地）
+│   ├── include/readex/   # 统一错误类型 + 核心接口头（pagination/search 为后续 PR 空壳，reader/decoder/book/parser 已落地）
 │   ├── src/core/         # 最小核心（版本/平台信息、冒烟演示，不依赖 QuickJS）
-│   ├── quickjs/          # QuickJS 2020-07-05 头文件 + readex 模块绑定骨架
+│   ├── src/book/         # Book Manager + 受管理句柄表（PR-3）
+│   ├── src/parser/       # 章节解析：规则表 + 标题匹配 + 字节偏移扫描（PR-3）
+│   ├── quickjs/          # QuickJS 2020-07-05 头文件 + readex 模块绑定（含 Book 对象绑定）
 │   ├── platform/buildroot/ # armhf 交叉工具链文件
 │   └── tests/            # C++ 单元测试（零依赖 assert 式小框架）
 ├── libs/                 # 原生 .so 插件（随 AMR 打包）
@@ -69,7 +71,7 @@ tools/build-fs-plugin.sh --check  # 仅对 libs/libjsapi_fs.so 自检
 
 ## Native Core（原生核心，重构中）
 
-按《Readex Native Core 原生化重构计划》（docs/）分 PR 推进。当前进度：**PR-2（文本读取与编码模块）已完成**。
+按《Readex Native Core 原生化重构计划》（docs/）分 PR 推进。当前进度：**PR-3（书籍与章节管理）已完成**（PR-4 分页 / PR-5 搜索与阅读状态未动）。
 
 ### PR-1 冒烟 API
 
@@ -92,7 +94,7 @@ JS 侧 `import Readex from 'readex'`：
 
 ```bash
 g++ -std=c++14 -I native/include -I native/tests \
-    native/tests/*.cpp native/src/core/*.cpp native/src/reader/*.cpp native/src/decoder/*.cpp \
+    native/tests/*.cpp native/src/{core,reader,decoder,parser,book}/*.cpp \
     -o native/tests/readex_tests
 ./native/tests/readex_tests
 
@@ -136,9 +138,11 @@ gcc -O2 -rdynamic -DCONFIG_VERSION=\"2020-07-05\" -I quickjs-2020-07-05 \
 # 先编 host 版 .so（把 JS_* 符号留给宿主）
 g++ -std=c++14 -shared -fPIC -fvisibility=hidden -O2 \
     -I native/quickjs -I native/include \
-    native/quickjs/*.cpp native/src/core/core.cpp -o libjsapi_readex_host.so
+    native/quickjs/*.cpp native/src/{core,reader,decoder,parser,book}/*.cpp \
+    -o libjsapi_readex_host.so
 
 ./smoke_host ./libjsapi_readex_host.so native/tests/host-smoke/smoke.mjs
+./smoke_host ./libjsapi_readex_host.so native/tests/host-smoke/smoke_pr3.mjs <测试书txt>
 ```
 
 ### PR-2 文本读取与编码（FileReader + TextDecoder）
@@ -172,10 +176,59 @@ g++ -std=c++14 -shared -fPIC -fvisibility=hidden -O2 \
 
 **性能探针**（host x86_64，非设备指标）：1.7MiB 混合文本 detect ≈ 2ms；64KiB 块流式读 + GBK 解码 ≈ 55–100MiB/s。
 
+### PR-3 书籍与章节管理（Book Manager + 章节解析 + QuickJS Book 绑定）
+
+纯 C++ 部分（`book.hpp` + `src/book/`、`parser.hpp` + `src/parser/`）不依赖 QuickJS，
+host 单元测试独立可跑；绑定层（`quickjs/book_binding.cpp`）只做参数校验与结果包装。
+
+**JS API 形状**（`import Readex from 'readex'`；宿主 QuickJS 头 2020-07-05 提供
+`JS_NewClass`/`JS_SetOpaque` 等生命周期 API，实测可编译可用，故 Book 采用
+**JS 对象持有句柄**方案（类名 `Book`），未退化为裸 handle id + 顶层方法）：
+
+| API | 返回 | 说明 |
+|---|---|---|
+| `Readex.openBook(path)` | Book 对象 | 缺参/非字符串→TypeError；文件不存在→Error `code=NotFound` |
+| `book.getInfo()` | object | `{ title, path, sizeBytes, encoding, chapterCount }`；`title` = 文件名去扩展名，`encoding` 为 `utf-8`/`utf-8-bom`/`utf-16le`/`utf-16be`/`gbk` |
+| `book.getChapters()` | array | `[{ title, index, startOffset, endOffset }]`，字节偏移（number） |
+| `book.getChapter(i)` | object | **形状固定为 `{ title, index, text }`**，`text` 为解码后的 UTF-8 字符串（含标题行，保留区间原文） |
+| `book.close()` | undefined | 幂等；close 后业务方法报 Error `code=InvalidHandle` |
+| `Readex.closeAllBooks()` | number | 关闭并释放全部 Book，返回数量（测试便利） |
+
+**生命周期**：JS 对象 opaque 只持句柄 id，Book 实例统一由受管理句柄表
+（`book_registry.hpp`，不暴露 C++ 指针）持有；显式 `close()` 或对象被 GC
+（class finalizer）都会释放条目（host 冒烟已用强制 GC 验证）。
+
+**章节识别（TXT）**：规则与解析逻辑分离，规则表集中在
+`parser.cpp defaultChapterRules()` 一处，可整体注入自定义规则（`scanChapters` 重载）：
+
+- Numbered：`第X章/节/回/卷/篇/部/集/幕`、`Chapter X`（大小写不敏感）；
+  数字支持阿拉伯/全角/中文（一二三十百千万零两…）；
+- Keyword：`序章/序言/序/前言/引子/楔子/番外/番外篇/尾声/后记/附录/终章/终卷/大结局`；
+- 标题行判定在**逐行解码后的 UTF-8 行文本**上做，字节偏移由**字节层编码感知行扫描**
+  保留（UTF-8/GBK 按 `0x0A`、UTF-16 按 `0x000A` 码元切行，多字节字符不会跨行界）；
+- 防正文误判：句末标点（。！？…）结尾的行视为句子不入目录；标题余部须以
+  分隔符/中文数字开头，无分隔符直连仅对短行（≤12 码点）生效；超长行（>512B）必为正文。
+  已知局限：极短正文行（如「第一章鱼」）可能误判，与主流阅读器行为一致。
+
+**偏移与区间语义**（PR-4 分页将依赖）：章节区间 `[startOffset, endOffset)` 首尾
+相接、无缝无重覆盖全书；标题章的 `startOffset` 指向标题行首字节；标题前的非空白
+内容成为第 0 章（title = 书名）；纯空白前缀并入第一章节（该章 startOffset = 0）；
+无章节文本 → 整本单章（title = 书名）；空文件 → 单个空章节。
+
+**性能/内存**：openBook 只做顺序扫描保留章节元数据（不驻留正文）；getChapter 经
+`FileReader.seek` 回读 + 64KiB 分块解码。host 探针（x86_64，非设备指标）：
+16MiB 书 openBook 的 RSS 增量 < 4MiB（测试断言，ASan 下跳过）。
+
+**host 冒烟**（QuickJS 2020-07-05 真实运行，非真机验证）：`smoke_pr3.mjs` 覆盖
+Book 全生命周期、章节内容/偏移、错误码（NotFound/InvalidHandle/TypeError/RangeError）、
+多书并行、closeAllBooks 与 GC finalizer 清理；另跑 `smoke.mjs` 确认 PR-1 冒烟 API 无回归。
+设备真机验证待 PR-4 一并进行。
+
 ### 接口头（后续 PR 空壳）
 
-`native/include/readex/` 下 `book.hpp` / `parser.hpp` / `pagination.hpp` / `search.hpp`
-只有接口声明与说明（`decoder.hpp` 已于 PR-2 落地），实现按 PR-3…PR-5 逐步落地，不以空实现冒充完成。
+`native/include/readex/` 下 `pagination.hpp` / `search.hpp` 仍只有接口声明与说明
+（`book.hpp` / `parser.hpp` 已于 PR-3 落地，`decoder.hpp` / `reader.hpp` 为 PR-2），
+实现按 PR-4…PR-5 逐步落地，不以空实现冒充完成。
 
 ### 内存与资源管理规范（PR-1 起生效）
 

@@ -36,6 +36,7 @@ add_library(readex_core STATIC
     src/reader/reader.cpp
     src/decoder/decoder.cpp
     src/parser/parser.cpp
+    src/pagination/pagination.cpp
     src/book/book.cpp
     src/book/book_registry.cpp
 )
@@ -88,6 +89,7 @@ if(READEX_BUILD_TESTS)
         tests/test_parser.cpp
         tests/test_book.cpp
         tests/test_book_registry.cpp
+        tests/test_pagination.cpp
     )
     target_include_directories(readex_tests PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include

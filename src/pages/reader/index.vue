@@ -19,9 +19,6 @@
                 <text class="reader-progress-label">{{status}}</text>
                 <text class="reader-progress-label">示例章节</text>
             </div>
-            <div class="reader-progress-track">
-                <div class="reader-progress-fill"></div>
-            </div>
             <text class="reader-hint">轻触左上角返回书架 · 正式书籍接入后显示真实进度</text>
         </div>
     </div>

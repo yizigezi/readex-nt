@@ -25,8 +25,6 @@
 </template>
 
 <script>
-import router from '@system.router'
-
 // X5 面板规格：254 × 800 px（2.97 英寸）。
 // 阅读区域按真实屏幕宽度扣除左右 18px 内边距计算。
 // Falcon 暂无稳定的节点布局测量 API，因此这里使用固定设计画布；
@@ -80,7 +78,7 @@ export default {
     },
     methods: {
         goBack() {
-            router.back()
+            this.$page.finish()
         },
         async runPagination() {
             const Readex = await loadReadex()

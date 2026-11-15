@@ -29,15 +29,12 @@
 </template>
 
 <script>
-import router from '@system.router'
-
 export default {
     name: 'index',
     methods: {
         openReader() {
-            router.push({
-                uri: '/reader'
-            })
+            // Falcon 原生页面导航；与 doge-reader 的 openLink() 保持一致。
+            $falcon.navTo('reader')
         }
     }
 }

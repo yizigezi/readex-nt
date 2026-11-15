@@ -69,9 +69,11 @@ async function loadReadex() {
 
 export default {
     name: 'reader',
-    data: {
-        pageText: SAMPLE_TEXT,
-        status: '排版预览'
+    data() {
+        return {
+            pageText: SAMPLE_TEXT,
+            status: '排版预览'
+        }
     },
     onShow() {
         this.runPagination()

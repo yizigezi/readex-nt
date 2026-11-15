@@ -1,27 +1,252 @@
 @import 'md-color.less';
 
-// 横屏条形屏毛坯布局（词典笔屏幕为横向长条形）
-// 全部用 vw/vh 相对单位，适配任意条形屏比例，分辨率真机确认后再补精调。
+/*
+ * Readex · Material 3 Expressive adapted for the X5 long portrait display.
+ * Design canvas: 254 × 800 px. Use full-width vertical layouts, clear grouping,
+ * expressive but restrained shapes, and high-contrast type hierarchy.
+ */
 
-.bar-screen {
+.page-shell {
     width: 100vw;
     height: 100vh;
-    flex-direction: row;
-    align-items: stretch;
+    flex-direction: column;
     background-color: @surface;
 }
 
-.entry {
-    flex: 1;
+.home-page {
+    width: 100vw;
+    height: 100vh;
+    flex-direction: column;
+    padding: 28px 16px 18px 16px;
+    background-color: @surface;
+}
+
+.home-header {
+    flex-direction: column;
+    margin-bottom: 22px;
+}
+
+.brand-label {
+    color: @primary;
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 1.5px;
+}
+
+.page-title {
+    color: @on-surface;
+    font-size: 29px;
+    font-weight: bold;
+    margin-top: 10px;
+}
+
+.page-subtitle {
+    color: @on-surface-variant;
+    font-size: 13px;
+    margin-top: 5px;
+}
+
+.continue-card {
+    width: 100%;
+    flex-direction: column;
+    padding: 18px 16px;
+    border-radius: 28px;
+    background-color: @primary-container;
+    margin-bottom: 24px;
+}
+
+.card-kicker {
+    color: @on-primary-container;
+    font-size: 10px;
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+
+.continue-title {
+    color: @on-primary-container;
+    font-size: 22px;
+    font-weight: bold;
+    margin-top: 16px;
+}
+
+.continue-description {
+    color: @on-primary-container;
+    font-size: 12px;
+    line-height: 18px;
+    margin-top: 7px;
+}
+
+.card-meta {
+    color: @on-primary-container;
+    font-size: 10px;
+    margin-top: 18px;
+}
+
+.progress-track {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background-color: #c9b8e8;
+    margin-top: 8px;
+}
+
+.progress-fill {
+    width: 38%;
+    height: 6px;
+    border-radius: 3px;
+    background-color: @primary;
+}
+
+.section-heading {
+    color: @on-surface;
+    font-size: 17px;
+    font-weight: bold;
+    margin-bottom: 12px;
+}
+
+.library-empty {
+    width: 100%;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    margin: 2vh 1vw;
-    border-radius: 2vh;
-    background-color: @primary-container;
+    padding: 22px 16px;
+    border-radius: 24px;
+    background-color: @surface-container;
 }
 
-.entry-name {
-    color: @on-primary-container;
-    font-size: 8vh;
+.empty-mark {
+    width: 46px;
+    height: 46px;
+    border-radius: 18px;
+    align-items: center;
+    justify-content: center;
+    background-color: @secondary-container;
+    color: @on-secondary-container;
+    font-size: 23px;
+    font-weight: bold;
+}
+
+.empty-title {
+    color: @on-surface;
+    font-size: 14px;
+    font-weight: bold;
+    margin-top: 12px;
+}
+
+.empty-description {
+    color: @on-surface-variant;
+    font-size: 11px;
+    text-align: center;
+    line-height: 16px;
+    margin-top: 6px;
+}
+
+.home-footer {
+    flex: 1;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.footer-caption {
+    color: @outline;
+    font-size: 10px;
+}
+
+.reader-page {
+    width: 100vw;
+    height: 100vh;
+    flex-direction: column;
+    background-color: @surface;
+}
+
+.reader-header {
+    width: 100vw;
+    height: 76px;
+    flex-direction: row;
+    align-items: center;
+    padding: 0 16px;
+    background-color: @surface;
+}
+
+.reader-back {
+    width: 42px;
+    height: 42px;
+    border-radius: 21px;
+    align-items: center;
+    justify-content: center;
+    background-color: @surface-container;
+    color: @on-surface;
+    font-size: 20px;
+}
+
+.reader-heading {
+    flex: 1;
+    flex-direction: column;
+    margin-left: 12px;
+}
+
+.reader-heading-title {
+    color: @on-surface;
+    font-size: 15px;
+    font-weight: bold;
+}
+
+.reader-heading-subtitle {
+    color: @on-surface-variant;
+    font-size: 10px;
+    margin-top: 4px;
+}
+
+.reader-content {
+    width: 100vw;
+    height: 624px;
+    padding: 14px 18px;
+    background-color: @surface;
+}
+
+.reader-text {
+    color: @on-surface;
+    font-size: 18px;
+    line-height: 1.65;
+}
+
+.reader-footer {
+    width: 100vw;
+    height: 100px;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0 18px;
+    background-color: @surface-container-low;
+}
+
+.reader-progress-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.reader-progress-label {
+    color: @on-surface-variant;
+    font-size: 10px;
+}
+
+.reader-progress-track {
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background-color: @outline-variant;
+    margin-top: 10px;
+}
+
+.reader-progress-fill {
+    width: 12%;
+    height: 4px;
+    border-radius: 2px;
+    background-color: @primary;
+}
+
+.reader-hint {
+    color: @outline;
+    font-size: 10px;
+    margin-top: 12px;
 }

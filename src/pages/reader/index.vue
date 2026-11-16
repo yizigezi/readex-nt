@@ -7,7 +7,7 @@
         </div>
 
         <div class="center-content reader-center">
-            <div class="reader-text" :style="readerTextStyle">{{pageText}}</div>
+            <text class="reader-text" :style="readerTextStyle">{{pageText}}</text>
         </div>
 
         <div class="right-rail reader-rail">

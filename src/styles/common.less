@@ -1,5 +1,11 @@
 @import 'md-color.less';
 
+/* MiSans（小米字体，免费商用）；运行时不支持 @font-face 时回退系统默认字体 */
+@font-face {
+    font-family: 'MiSans';
+    src: url('../assets/fonts/MiSans-Regular.ttf');
+}
+
 /* Landscape 800 × 254 px. Side rails remain transparent. */
 .home-page,
 .reader-page {
@@ -7,6 +13,7 @@
     height: 100vh;
     flex-direction: row;
     background-color: @surface;
+    font-family: 'MiSans', sans-serif;
     position: relative;
 }
 
@@ -162,6 +169,7 @@
     width: 624px;
     height: 230px;
     color: @on-surface;
+    font-family: 'MiSans', sans-serif;
     font-size: 17px;
     line-height: 26px;
     text-align: left;

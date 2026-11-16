@@ -1,9 +1,10 @@
 @import 'md-color.less';
 
-/* MiSans（小米字体，免费商用）；运行时不支持 @font-face 时回退系统默认字体 */
+/* MiSans（小米字体，免费商用）；打包器会把根目录 assets/ 原样打进 AMR，
+   url 多写几种路径形式由运行时自行解析；均失败时回退系统默认字体 */
 @font-face {
     font-family: 'MiSans';
-    src: url('../assets/fonts/MiSans-Regular.ttf');
+    src: url('/assets/MiSans-Regular.ttf'), url('assets/MiSans-Regular.ttf'), url('../assets/MiSans-Regular.ttf');
 }
 
 /* Landscape 800 × 254 px. Side rails remain transparent. */

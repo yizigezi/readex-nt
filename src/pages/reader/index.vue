@@ -4,11 +4,9 @@
             <div class="left-rail-top" @click="goBack">
                 <text class="rail-back">‹</text>
             </div>
-            <div class="rail-actions">
-                <div class="rail-action">
-                    <text class="rail-icon">☰</text>
-                    <text class="rail-label">目录</text>
-                </div>
+            <div class="right-action" @click="previousPage">
+                <text class="right-icon">‹</text>
+                <text class="right-label">上一页</text>
             </div>
         </div>
 
@@ -17,40 +15,23 @@
         </div>
 
         <div class="right-rail">
-            <div class="right-action">
-                <text class="right-icon">Aa</text>
-                <text class="right-label">字号</text>
+            <div class="right-action" @click="nextPage">
+                <text class="right-icon">›</text>
+                <text class="right-label">下一页</text>
             </div>
             <div class="right-action">
-                <text class="right-icon">☼</text>
-                <text class="right-label">亮度</text>
-            </div>
-            <div class="right-action">
-                <text class="right-icon">◐</text>
-                <text class="right-label">主题</text>
-            </div>
-            <div class="right-action">
-                <text class="right-icon">•••</text>
-                <text class="right-label">更多</text>
+                <text class="right-icon">{{pageNumber}}</text>
+                <text class="right-label">页码</text>
             </div>
         </div>
     </div>
 </template>
 
 <script>
-// X5 横屏设计画布：800 × 254 px。
-// 左右功能栏各约 64px，正文区域约 672px。
-const CONTENT_WIDTH = 636
-const CONTENT_HEIGHT = 224
+import { getCurrentBookPath } from '../../utils/BookSession.js'
 
-const SAMPLE_TEXT =
-    '第一章 纸页之间\n\n' +
-    '阅读，是在忙碌的日子里，为自己留下一小段安静的时间。故事从一行文字开始，在脑海中慢慢铺展开来。\n\n' +
-    '窗外的风轻轻吹过，书页停留在熟悉的段落。那些曾经匆匆略过的句子，在重新读到时，忽然有了新的意味。\n\n' +
-    '有时我们读一个人的经历，有时我们读一座城市的变化，也有时，只是想知道下一页会发生什么。文字不必总是给出答案，它也可以陪伴我们思考。\n\n' +
-    '这是一段用于检查中文排版的示例内容。界面会根据屏幕可用宽度进行分页，并尽量让段落、标点和中英文混排保持自然。\n\n' +
-    'Reading should feel calm and comfortable. Mixed language, numbers like 2026, and punctuation should remain clear on this display.\n\n' +
-    '当你再次翻开一本书，愿你总能在字里行间，找到属于自己的节奏。'
+const CONTENT_WIDTH = 620
+const CONTENT_HEIGHT = 220
 
 function jsIndexForByte(str, byteOff) {
     let bytes = 0
@@ -69,54 +50,107 @@ function jsIndexForByte(str, byteOff) {
 }
 
 async function loadReadex() {
-    try {
-        const mod = await import('readex')
-        return mod && (mod.default || mod)
-    } catch (e) {
-        return null
-    }
+    const mod = await import('readex')
+    return mod && (mod.default || mod)
 }
 
 export default {
     name: 'reader',
     data() {
         return {
-            pageText: SAMPLE_TEXT
+            pageText: '正在打开本地书籍…',
+            pageNumber: '—',
+            pageTexts: [],
+            currentPage: 0,
+            book: null,
+            bookTitle: '',
+            status: ''
         }
     },
     onShow() {
-        this.runPagination()
+        this.loadBook()
     },
     methods: {
-        goBack() {
-            this.$page.finish()
-        },
-        async runPagination() {
-            const Readex = await loadReadex()
-            if (!Readex || typeof Readex.paginate !== 'function') return
-
+        async loadBook() {
+            const path = getCurrentBookPath()
+            if (!path) {
+                this.pageText = '没有选择书籍，请返回本地书架重新打开。'
+                return
+            }
+            this.pageText = '正在读取：' + path
+            this.pageTexts = []
+            this.currentPage = 0
             try {
-                const pages = Readex.paginate(SAMPLE_TEXT, {
+                const Readex = await loadReadex()
+                if (!Readex || typeof Readex.openBook !== 'function') {
+                    throw new Error('Readex 原生模块未加载，请确认 libjsapi_readex.so 已打包安装')
+                }
+                const book = Readex.openBook(path)
+                const info = book.getInfo()
+                const chapters = book.getChapters()
+                if (!chapters || chapters.length === 0) {
+                    throw new Error('文件中没有可读取的章节')
+                }
+                const chapter = book.getChapter(0)
+                const text = chapter && chapter.text ? chapter.text : ''
+                if (!text) throw new Error('书籍内容为空')
+
+                const pages = Readex.paginate(text, {
                     width: CONTENT_WIDTH,
                     height: CONTENT_HEIGHT,
                     fontSize: 17,
                     lineHeight: 1.55,
+                    paragraphSpacing: 8,
                     paddingTop: 0,
                     paddingBottom: 0,
                     paddingLeft: 0,
-                    paddingRight: 0,
-                    paragraphSpacing: 8
+                    paddingRight: 0
                 })
+                const pageTexts = []
                 if (pages && pages.length) {
-                    const first = pages[0]
-                    this.pageText = SAMPLE_TEXT.substring(
-                        jsIndexForByte(SAMPLE_TEXT, first.startOffset),
-                        jsIndexForByte(SAMPLE_TEXT, first.endOffset)
-                    )
+                    for (let i = 0; i < pages.length; i++) {
+                        pageTexts.push(text.substring(
+                            jsIndexForByte(text, pages[i].startOffset),
+                            jsIndexForByte(text, pages[i].endOffset)
+                        ))
+                    }
                 }
+                if (pageTexts.length === 0) pageTexts.push(text)
+                if (this.book && typeof this.book.close === 'function') {
+                    try { this.book.close() } catch (e) {}
+                }
+                this.book = book
+                this.bookTitle = info && info.title ? info.title : path
+                this.pageTexts = pageTexts
+                this.currentPage = 0
+                this.updatePage()
             } catch (e) {
-                // 保留完整示例文本，避免分页模块异常影响阅读页显示。
+                this.pageText = '打开失败：' + (e && e.message ? e.message : String(e))
+                this.pageNumber = '—'
+                this.status = 'error'
             }
+        },
+        updatePage() {
+            if (!this.pageTexts.length) return
+            this.pageText = this.pageTexts[this.currentPage] || ''
+            this.pageNumber = (this.currentPage + 1) + '/' + this.pageTexts.length
+        },
+        previousPage() {
+            if (this.currentPage <= 0) return
+            this.currentPage--
+            this.updatePage()
+        },
+        nextPage() {
+            if (this.currentPage >= this.pageTexts.length - 1) return
+            this.currentPage++
+            this.updatePage()
+        },
+        goBack() {
+            if (this.book && typeof this.book.close === 'function') {
+                try { this.book.close() } catch (e) {}
+                this.book = null
+            }
+            this.$page.finish()
         }
     }
 }

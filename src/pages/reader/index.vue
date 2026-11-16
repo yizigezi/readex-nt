@@ -1,37 +1,47 @@
 <template>
     <div class="reader-page">
-        <div class="reader-header">
-            <div class="reader-back" @click="goBack">
-                <text>‹</text>
+        <div class="left-rail">
+            <div class="left-rail-top" @click="goBack">
+                <text class="rail-back">‹</text>
             </div>
-            <div class="reader-heading">
-                <text class="reader-heading-title">沉浸式阅读</text>
-                <text class="reader-heading-subtitle">READEX  ·  排版预览</text>
+            <div class="rail-actions">
+                <div class="rail-action">
+                    <text class="rail-icon">☰</text>
+                    <text class="rail-label">目录</text>
+                </div>
             </div>
         </div>
 
-        <div class="reader-content">
+        <div class="center-content reader-center">
             <text class="reader-text">{{pageText}}</text>
         </div>
 
-        <div class="reader-footer">
-            <div class="reader-progress-row">
-                <text class="reader-progress-label">{{status}}</text>
-                <text class="reader-progress-label">示例章节</text>
+        <div class="right-rail">
+            <div class="right-action">
+                <text class="right-icon">Aa</text>
+                <text class="right-label">字号</text>
             </div>
-            <text class="reader-hint">轻触左上角返回书架 · 正式书籍接入后显示真实进度</text>
+            <div class="right-action">
+                <text class="right-icon">☼</text>
+                <text class="right-label">亮度</text>
+            </div>
+            <div class="right-action">
+                <text class="right-icon">◐</text>
+                <text class="right-label">主题</text>
+            </div>
+            <div class="right-action">
+                <text class="right-icon">•••</text>
+                <text class="right-label">更多</text>
+            </div>
         </div>
     </div>
 </template>
 
 <script>
-// X5 面板规格：254 × 800 px（2.97 英寸）。
-// 阅读区域按真实屏幕宽度扣除左右 18px 内边距计算。
-// Falcon 暂无稳定的节点布局测量 API，因此这里使用固定设计画布；
-// 其他相近尺寸型号可在后续根据实际屏幕宽高做比例适配。
-const SCREEN_WIDTH = 254
-const CONTENT_WIDTH = SCREEN_WIDTH - 36
-const CONTENT_HEIGHT = 596
+// X5 横屏设计画布：800 × 254 px。
+// 左右功能栏各约 64px，正文区域约 672px。
+const CONTENT_WIDTH = 636
+const CONTENT_HEIGHT = 224
 
 const SAMPLE_TEXT =
     '第一章 纸页之间\n\n' +
@@ -39,7 +49,7 @@ const SAMPLE_TEXT =
     '窗外的风轻轻吹过，书页停留在熟悉的段落。那些曾经匆匆略过的句子，在重新读到时，忽然有了新的意味。\n\n' +
     '有时我们读一个人的经历，有时我们读一座城市的变化，也有时，只是想知道下一页会发生什么。文字不必总是给出答案，它也可以陪伴我们思考。\n\n' +
     '这是一段用于检查中文排版的示例内容。界面会根据屏幕可用宽度进行分页，并尽量让段落、标点和中英文混排保持自然。\n\n' +
-    'Reading should feel calm and comfortable. Mixed language, numbers like 2026, and punctuation should remain clear on this narrow display.\n\n' +
+    'Reading should feel calm and comfortable. Mixed language, numbers like 2026, and punctuation should remain clear on this display.\n\n' +
     '当你再次翻开一本书，愿你总能在字里行间，找到属于自己的节奏。'
 
 function jsIndexForByte(str, byteOff) {
@@ -71,8 +81,7 @@ export default {
     name: 'reader',
     data() {
         return {
-            pageText: SAMPLE_TEXT,
-            status: '排版预览'
+            pageText: SAMPLE_TEXT
         }
     },
     onShow() {
@@ -84,22 +93,19 @@ export default {
         },
         async runPagination() {
             const Readex = await loadReadex()
-            if (!Readex || typeof Readex.paginate !== 'function') {
-                this.status = '预览模式'
-                return
-            }
+            if (!Readex || typeof Readex.paginate !== 'function') return
 
             try {
                 const pages = Readex.paginate(SAMPLE_TEXT, {
                     width: CONTENT_WIDTH,
                     height: CONTENT_HEIGHT,
-                    fontSize: 18,
-                    lineHeight: 1.65,
+                    fontSize: 17,
+                    lineHeight: 1.55,
                     paddingTop: 0,
                     paddingBottom: 0,
                     paddingLeft: 0,
                     paddingRight: 0,
-                    paragraphSpacing: 10
+                    paragraphSpacing: 8
                 })
                 if (pages && pages.length) {
                     const first = pages[0]
@@ -107,10 +113,9 @@ export default {
                         jsIndexForByte(SAMPLE_TEXT, first.startOffset),
                         jsIndexForByte(SAMPLE_TEXT, first.endOffset)
                     )
-                    this.status = '第 1 页 / 共 ' + pages.length + ' 页'
                 }
             } catch (e) {
-                this.status = '排版预览'
+                // 保留完整示例文本，避免分页模块异常影响阅读页显示。
             }
         }
     }

@@ -1,252 +1,236 @@
 @import 'md-color.less';
 
 /*
- * Readex · Material 3 Expressive adapted for the X5 long portrait display.
- * Design canvas: 254 × 800 px. Use full-width vertical layouts, clear grouping,
- * expressive but restrained shapes, and high-contrast type hierarchy.
+ * Readex landscape layout for Youdao X5.
+ * Design canvas: 800 × 254 px.
+ * Three zones: transparent left actions / content / transparent right actions.
  */
 
 .page-shell {
     width: 100vw;
     height: 100vh;
-    flex-direction: column;
+    flex-direction: row;
     background-color: @surface;
 }
 
 .home-page {
     width: 100vw;
     height: 100vh;
-    flex-direction: column;
-    padding: 28px 16px 18px 16px;
+    flex-direction: row;
     background-color: @surface;
 }
 
-.home-header {
+.left-rail {
+    width: 64px;
+    height: 100vh;
     flex-direction: column;
-    margin-bottom: 22px;
+    align-items: center;
+    padding: 7px 4px;
+    background-color: transparent;
 }
 
-.brand-label {
-    color: @primary;
-    font-size: 11px;
-    font-weight: bold;
-    letter-spacing: 1.5px;
+.left-rail-top {
+    width: 100%;
+    height: 48px;
+    align-items: center;
+    justify-content: center;
 }
 
-.page-title {
+.rail-back {
     color: @on-surface;
-    font-size: 29px;
-    font-weight: bold;
-    margin-top: 10px;
+    font-size: 28px;
+    font-weight: normal;
 }
 
-.page-subtitle {
-    color: @on-surface-variant;
-    font-size: 13px;
-    margin-top: 5px;
-}
-
-.continue-card {
+.rail-actions {
+    flex: 1;
     width: 100%;
     flex-direction: column;
-    padding: 18px 16px;
-    border-radius: 28px;
+    align-items: center;
+    justify-content: center;
+}
+
+.rail-action {
+    width: 52px;
+    height: 52px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin-top: 3px;
+    margin-bottom: 3px;
+    border-radius: 17px;
+}
+
+.rail-action-active {
     background-color: @primary-container;
-    margin-bottom: 24px;
 }
 
-.card-kicker {
+.rail-icon {
+    color: @on-surface-variant;
+    font-size: 21px;
+    line-height: 24px;
+}
+
+.rail-action-active .rail-icon {
     color: @on-primary-container;
-    font-size: 10px;
-    font-weight: bold;
-    letter-spacing: 1px;
 }
 
-.continue-title {
+.rail-label {
+    color: @on-surface-variant;
+    font-size: 9px;
+    margin-top: 2px;
+}
+
+.rail-action-active .rail-label {
     color: @on-primary-container;
-    font-size: 22px;
-    font-weight: bold;
-    margin-top: 16px;
 }
 
-.continue-description {
-    color: @on-primary-container;
-    font-size: 12px;
-    line-height: 18px;
-    margin-top: 7px;
+.center-content {
+    flex: 1;
+    height: 100vh;
+    min-width: 0;
+    flex-direction: column;
+    justify-content: center;
+    padding: 12px 8px;
+    background-color: @surface;
 }
 
-.card-meta {
-    color: @on-primary-container;
-    font-size: 10px;
-    margin-top: 18px;
+.right-rail {
+    width: 64px;
+    height: 100vh;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 7px 4px;
+    background-color: transparent;
 }
 
-.progress-track {
-    width: 100%;
-    height: 6px;
-    border-radius: 3px;
-    background-color: #c9b8e8;
-    margin-top: 8px;
+.right-action {
+    width: 54px;
+    height: 54px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin-top: 2px;
+    margin-bottom: 2px;
+    border-radius: 16px;
 }
 
-.progress-fill {
-    width: 38%;
-    height: 6px;
-    border-radius: 3px;
-    background-color: @primary;
+.right-icon {
+    color: @on-surface-variant;
+    font-size: 20px;
+    line-height: 24px;
 }
 
-.section-heading {
-    color: @on-surface;
-    font-size: 17px;
-    font-weight: bold;
+.right-label {
+    color: @on-surface-variant;
+    font-size: 9px;
+    margin-top: 2px;
+}
+
+/* Home: a single horizontal shelf row to preserve the short screen height. */
+.home-center {
+    justify-content: center;
+}
+
+.home-heading {
+    flex-direction: row;
+    align-items: baseline;
     margin-bottom: 12px;
 }
 
-.library-empty {
-    width: 100%;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 22px 16px;
-    border-radius: 24px;
-    background-color: @surface-container;
+.home-title {
+    color: @on-surface;
+    font-size: 20px;
+    font-weight: bold;
 }
 
-.empty-mark {
-    width: 46px;
-    height: 46px;
-    border-radius: 18px;
-    align-items: center;
-    justify-content: center;
-    background-color: @secondary-container;
-    color: @on-secondary-container;
-    font-size: 23px;
+.home-subtitle {
+    color: @on-surface-variant;
+    font-size: 10px;
+    margin-left: 9px;
+}
+
+.shelf-row {
+    width: 100%;
+    height: 142px;
+    flex-direction: row;
+    align-items: stretch;
+}
+
+.feature-card {
+    width: 178px;
+    height: 142px;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 13px 14px;
+    border-radius: 20px;
+    background-color: @primary-container;
+    margin-right: 9px;
+}
+
+.feature-kicker {
+    color: @on-primary-container;
+    font-size: 9px;
     font-weight: bold;
+}
+
+.feature-title {
+    color: @on-primary-container;
+    font-size: 19px;
+    font-weight: bold;
+}
+
+.feature-description {
+    color: @on-primary-container;
+    font-size: 10px;
+    line-height: 14px;
+}
+
+.feature-link {
+    color: @on-primary-container;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+.empty-shelf-card {
+    flex: 1;
+    height: 142px;
+    flex-direction: column;
+    justify-content: center;
+    padding: 12px 15px;
+    border-radius: 20px;
+    background-color: @surface-container;
 }
 
 .empty-title {
     color: @on-surface;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: bold;
-    margin-top: 12px;
 }
 
 .empty-description {
     color: @on-surface-variant;
-    font-size: 11px;
-    text-align: center;
-    line-height: 16px;
+    font-size: 10px;
+    line-height: 14px;
     margin-top: 6px;
 }
 
-.home-footer {
-    flex: 1;
-    justify-content: flex-end;
-    align-items: center;
-}
-
-.footer-caption {
-    color: @outline;
-    font-size: 10px;
-}
-
+/* Reader: the center column contains only the reading text. */
 .reader-page {
     width: 100vw;
     height: 100vh;
-    flex-direction: column;
-    background-color: @surface;
-}
-
-.reader-header {
-    width: 100vw;
-    height: 76px;
     flex-direction: row;
-    align-items: center;
-    padding: 0 16px;
     background-color: @surface;
 }
 
-.reader-back {
-    width: 48px;
-    height: 48px;
-    border-radius: 24px;
-    align-items: center;
+.reader-center {
     justify-content: center;
-    background-color: @surface-container;
-    color: @on-surface;
-    font-size: 20px;
-}
-
-.reader-heading {
-    flex: 1;
-    flex-direction: column;
-    margin-left: 12px;
-}
-
-.reader-heading-title {
-    color: @on-surface;
-    font-size: 15px;
-    font-weight: bold;
-}
-
-.reader-heading-subtitle {
-    color: @on-surface-variant;
-    font-size: 10px;
-    margin-top: 4px;
-}
-
-.reader-content {
-    width: 100vw;
-    flex: 1;
-    padding: 14px 18px;
-    background-color: @surface;
+    padding: 10px 18px;
 }
 
 .reader-text {
     color: @on-surface;
-    font-size: 18px;
-    line-height: 1.65;
-}
-
-.reader-footer {
-    width: 100vw;
-    height: 100px;
-    flex-direction: column;
-    justify-content: center;
-    padding: 0 18px;
-    background-color: @surface-container-low;
-}
-
-.reader-progress-row {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.reader-progress-label {
-    color: @on-surface-variant;
-    font-size: 10px;
-}
-
-.reader-progress-track {
-    width: 100%;
-    height: 4px;
-    border-radius: 2px;
-    background-color: @outline-variant;
-    margin-top: 10px;
-}
-
-.reader-progress-fill {
-    width: 12%;
-    height: 4px;
-    border-radius: 2px;
-    background-color: @primary;
-}
-
-.reader-hint {
-    color: @outline;
-    font-size: 10px;
-    margin-top: 12px;
+    font-size: 17px;
+    line-height: 1.55;
 }

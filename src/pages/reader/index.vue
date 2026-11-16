@@ -1,27 +1,49 @@
 <template>
     <div class="reader-page">
         <div class="left-rail">
-            <div class="left-rail-top" @click="goBack">
-                <text class="rail-back">‹</text>
-            </div>
-            <div class="right-action" @click="previousPage">
-                <text class="right-icon">‹</text>
-                <text class="right-label">上一页</text>
+            <div class="rail-button back-button" @click="goBack">
+                <text class="rail-icon">‹</text>
             </div>
         </div>
 
         <div class="center-content reader-center">
-            <text class="reader-text">{{pageText}}</text>
+            <div class="reader-text" :style="readerTextStyle">{{pageText}}</div>
         </div>
 
-        <div class="right-rail">
-            <div class="right-action" @click="nextPage">
-                <text class="right-icon">›</text>
-                <text class="right-label">下一页</text>
+        <div class="right-rail reader-rail">
+            <div class="rail-button" @click="previousPage">
+                <text class="rail-icon">‹</text>
             </div>
-            <div class="right-action">
-                <text class="right-icon">{{pageNumber}}</text>
-                <text class="right-label">页码</text>
+            <div class="rail-button" @click="nextPage">
+                <text class="rail-icon">›</text>
+            </div>
+            <div class="rail-button" @click="toggleSettings">
+                <text class="rail-icon">⚙</text>
+            </div>
+        </div>
+
+        <div class="settings-mask" v-if="settingsVisible" @click="closeSettings">
+            <div class="settings-panel" @click.stop>
+                <div class="settings-header">
+                    <text class="settings-title">阅读设置</text>
+                    <div class="settings-close" @click="closeSettings"><text class="settings-control-icon">×</text></div>
+                </div>
+                <div class="setting-row">
+                    <text class="setting-label">字号</text>
+                    <div class="setting-stepper">
+                        <div class="setting-control" @click="changeFontSize(-1)"><text class="settings-control-icon">−</text></div>
+                        <text class="setting-value">{{settings.fontSize}} px</text>
+                        <div class="setting-control" @click="changeFontSize(1)"><text class="settings-control-icon">＋</text></div>
+                    </div>
+                </div>
+                <div class="setting-row">
+                    <text class="setting-label">行距</text>
+                    <div class="setting-stepper">
+                        <div class="setting-control" @click="changeLineHeight(-0.05)"><text class="settings-control-icon">−</text></div>
+                        <text class="setting-value">{{settings.lineHeight.toFixed(2)}} ×</text>
+                        <div class="setting-control" @click="changeLineHeight(0.05)"><text class="settings-control-icon">＋</text></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -29,24 +51,37 @@
 
 <script>
 import { getCurrentBookPath } from '../../utils/BookSession.js'
+import {
+    loadSettings,
+    saveSettings,
+    loadBookCatalog,
+    displayBookTitle
+} from '../../utils/BookLibrary.js'
 
-const CONTENT_WIDTH = 620
-const CONTENT_HEIGHT = 220
+const SCREEN_WIDTH = 800
+const SCREEN_HEIGHT = 254
+const LEFT_RAIL_WIDTH = 68
+const RIGHT_RAIL_WIDTH = 76
+const CONTENT_WIDTH = SCREEN_WIDTH - LEFT_RAIL_WIDTH - RIGHT_RAIL_WIDTH
+const PADDING_LEFT = 16
+const PADDING_RIGHT = 16
+const PADDING_TOP = 12
+const PADDING_BOTTOM = 12
 
-function jsIndexForByte(str, byteOff) {
+function byteOffsetToStringIndex(value, byteOffset) {
+    const target = Math.max(0, Number(byteOffset) || 0)
     let bytes = 0
-    let i = 0
-    while (i < str.length && bytes < byteOff) {
-        const c = str.charCodeAt(i)
-        if (c < 0x80) bytes += 1
-        else if (c < 0x800) bytes += 2
-        else if (c >= 0xD800 && c < 0xDC00 && i + 1 < str.length) {
-            bytes += 4
-            i++
-        } else bytes += 3
-        i++
+    let index = 0
+    while (index < value.length && bytes < target) {
+        const cp = value.codePointAt(index)
+        let byteLength = 1
+        if (cp > 0x7F && cp <= 0x7FF) byteLength = 2
+        else if (cp > 0x7FF && cp <= 0xFFFF) byteLength = 3
+        else if (cp > 0xFFFF) byteLength = 4
+        bytes += byteLength
+        index += cp > 0xFFFF ? 2 : 1
     }
-    return i
+    return index
 }
 
 async function loadReadex() {
@@ -65,28 +100,57 @@ export default {
             currentChapter: 0,
             chapters: [],
             book: null,
+            bookPath: '',
             bookTitle: '',
-            status: ''
+            settings: { fontSize: 17, lineHeight: 1.55 },
+            settingsVisible: false,
+            loading: false
+        }
+    },
+    computed: {
+        readerTextStyle() {
+            return {
+                fontSize: this.settings.fontSize + 'px',
+                lineHeight: (this.settings.fontSize * this.settings.lineHeight) + 'px'
+            }
         }
     },
     onShow() {
         this.loadBook()
     },
     methods: {
+        paginationConfig() {
+            return {
+                width: CONTENT_WIDTH,
+                height: SCREEN_HEIGHT,
+                fontSize: this.settings.fontSize,
+                lineHeight: this.settings.lineHeight,
+                paragraphSpacing: this.settings.fontSize * 0.45,
+                paddingTop: PADDING_TOP,
+                paddingBottom: PADDING_BOTTOM,
+                paddingLeft: PADDING_LEFT,
+                paddingRight: PADDING_RIGHT
+            }
+        },
         async loadBook() {
             const path = getCurrentBookPath()
             if (!path) {
-                this.pageText = '没有选择书籍，请返回本地书架重新打开。'
+                this.pageText = '没有选择书籍，请返回首页。'
                 return
             }
+            this.loading = true
+            this.bookPath = path
             this.pageText = '正在读取本地文件…'
             this.pageTexts = []
             this.currentPage = 0
             let openedBook = null
             try {
+                this.settings = await loadSettings()
+                const catalog = await loadBookCatalog()
+                this.bookTitle = displayBookTitle(catalog, path)
                 const Readex = await loadReadex()
                 if (!Readex || typeof Readex.openBook !== 'function') {
-                    throw new Error('Readex 原生模块未加载，请确认 libjsapi_readex.so 已打包安装')
+                    throw new Error('Readex 原生模块未加载，请确认 libjsapi_readex.so 已安装')
                 }
                 openedBook = Readex.openBook(path)
                 const info = openedBook.getInfo()
@@ -99,7 +163,7 @@ export default {
                 }
                 this.book = openedBook
                 openedBook = null
-                this.bookTitle = info && info.title ? info.title : path
+                this.bookTitle = this.bookTitle || (info && info.title) || path
                 this.chapters = chapters
                 this.currentChapter = 0
                 await this.loadChapter(0, 0)
@@ -109,39 +173,28 @@ export default {
                 }
                 this.pageText = '打开失败：' + (e && e.message ? e.message : String(e))
                 this.pageNumber = '—'
-                this.status = 'error'
+            } finally {
+                this.loading = false
             }
         },
         async loadChapter(chapterIndex, pageIndex) {
             if (!this.book || chapterIndex < 0 || chapterIndex >= this.chapters.length) return
             const chapter = this.book.getChapter(chapterIndex)
             const text = chapter && chapter.text ? chapter.text : ''
-            if (!text) throw new Error('章节内容为空：' + (chapter && chapter.title ? chapter.title : chapterIndex))
-            const Readex = await loadReadex()
-            const pages = Readex.paginate(text, {
-                width: CONTENT_WIDTH,
-                height: CONTENT_HEIGHT,
-                fontSize: 17,
-                lineHeight: 1.55,
-                paragraphSpacing: 8,
-                paddingTop: 0,
-                paddingBottom: 0,
-                paddingLeft: 0,
-                paddingRight: 0
-            })
+            if (!text) throw new Error('章节内容为空')
+            const pages = this.book.paginateChapter(chapterIndex, this.paginationConfig())
             const pageTexts = []
             if (pages && pages.length) {
                 for (let i = 0; i < pages.length; i++) {
-                    pageTexts.push(text.substring(
-                        jsIndexForByte(text, pages[i].startOffset),
-                        jsIndexForByte(text, pages[i].endOffset)
-                    ))
+                    const start = byteOffsetToStringIndex(text, pages[i].startOffset)
+                    const end = byteOffsetToStringIndex(text, pages[i].endOffset)
+                    pageTexts.push(text.substring(start, end))
                 }
             }
             if (pageTexts.length === 0) pageTexts.push(text)
             this.currentChapter = chapterIndex
             this.pageTexts = pageTexts
-            this.currentPage = Math.max(0, Math.min(pageIndex || 0, pageTexts.length - 1))
+            this.currentPage = Math.max(0, Math.min(Number(pageIndex) || 0, pageTexts.length - 1))
             this.updatePage()
         },
         updatePage() {
@@ -177,6 +230,32 @@ export default {
                 } catch (e) {
                     this.pageText = '下一章加载失败：' + (e && e.message ? e.message : String(e))
                 }
+            }
+        },
+        toggleSettings() {
+            this.settingsVisible = !this.settingsVisible
+        },
+        closeSettings() {
+            this.settingsVisible = false
+        },
+        async changeFontSize(delta) {
+            const value = Math.max(12, Math.min(30, this.settings.fontSize + delta))
+            if (value === this.settings.fontSize) return
+            this.settings.fontSize = value
+            await this.applySettings()
+        },
+        async changeLineHeight(delta) {
+            const value = Math.max(1.1, Math.min(2.2, Math.round((this.settings.lineHeight + delta) * 100) / 100))
+            if (value === this.settings.lineHeight) return
+            this.settings.lineHeight = value
+            await this.applySettings()
+        },
+        async applySettings() {
+            try {
+                this.settings = await saveSettings(this.settings)
+                if (this.book) await this.loadChapter(this.currentChapter, this.currentPage)
+            } catch (e) {
+                this.pageText = '保存设置失败：' + (e && e.message ? e.message : String(e))
             }
         },
         goBack() {

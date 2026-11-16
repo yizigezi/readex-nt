@@ -25,7 +25,7 @@
                 <text class="status-text">这个文件夹里没有 TXT 文件</text>
             </div>
 
-            <scroll-view v-else class="shelf-row" scroll-x="true" scroll-y="false">
+            <scroller v-else class="shelf-row" scroll-direction="horizontal" show-scrollbar="false">
                 <div
                     class="file-card"
                     v-for="entry in visibleBooks"
@@ -39,7 +39,7 @@
                     <text class="file-title">{{entry.title || entry.name}}</text>
                     <text class="file-meta" v-if="entry.isDirectory">文件夹</text>
                 </div>
-            </scroll-view>
+            </scroller>
         </div>
 
         <div class="right-rail">

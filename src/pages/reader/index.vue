@@ -51,6 +51,7 @@
 
 <script>
 import { getCurrentBookPath } from '../../utils/BookSession.js'
+import { logEvent, logError } from '../../utils/Logger.js'
 import {
     loadSettings,
     saveSettings,
@@ -134,8 +135,10 @@ export default {
         },
         async loadBook() {
             const path = getCurrentBookPath()
+            await logEvent('reader.loadBook.start', 'path=' + (path || '<empty>'))
             if (!path) {
                 this.pageText = '没有选择书籍，请返回首页。'
+                await logEvent('reader.loadBook.abort', 'no book path')
                 return
             }
             this.loading = true
@@ -145,16 +148,36 @@ export default {
             this.currentPage = 0
             let openedBook = null
             try {
+                await logEvent('reader.loadBook.loadSettings.begin')
                 this.settings = await loadSettings()
+                await logEvent('reader.loadBook.loadSettings.done', this.settings)
+
+                await logEvent('reader.loadBook.loadCatalog.begin')
                 const catalog = await loadBookCatalog()
                 this.bookTitle = displayBookTitle(catalog, path)
+                await logEvent('reader.loadBook.loadCatalog.done', 'title=' + this.bookTitle)
+
+                await logEvent('reader.loadBook.importReadex.begin')
                 const Readex = await loadReadex()
+                await logEvent('reader.loadBook.importReadex.done', 'available=' + !!Readex)
                 if (!Readex || typeof Readex.openBook !== 'function') {
                     throw new Error('Readex 原生模块未加载，请确认 libjsapi_readex.so 已安装')
                 }
+
+                // openBook is synchronous and may scan the entire file. The
+                // "begin" entry is flushed before entering native code so a
+                // hang can be distinguished from later chapter/pagination work.
+                await logEvent('reader.loadBook.openBook.begin', 'path=' + path)
                 openedBook = Readex.openBook(path)
+                await logEvent('reader.loadBook.openBook.done')
+
+                await logEvent('reader.loadBook.getInfo.begin')
                 const info = openedBook.getInfo()
+                await logEvent('reader.loadBook.getInfo.done', info && info.title)
+
+                await logEvent('reader.loadBook.getChapters.begin')
                 const chapters = openedBook.getChapters()
+                await logEvent('reader.loadBook.getChapters.done', 'count=' + (chapters ? chapters.length : 0))
                 if (!chapters || chapters.length === 0) {
                     throw new Error('文件中没有可读取的章节')
                 }
@@ -166,23 +189,33 @@ export default {
                 this.bookTitle = this.bookTitle || (info && info.title) || path
                 this.chapters = chapters
                 this.currentChapter = 0
+                await logEvent('reader.loadBook.loadChapter.begin', 'index=0')
                 await this.loadChapter(0, 0)
+                await logEvent('reader.loadBook.done', 'chapters=' + chapters.length)
             } catch (e) {
+                await logError('reader.loadBook', e)
                 if (openedBook && typeof openedBook.close === 'function') {
-                    try { openedBook.close() } catch (closeError) {}
+                    try { openedBook.close() } catch (closeError) {
+                        await logError('reader.loadBook.close', closeError)
+                    }
                 }
                 this.pageText = '打开失败：' + (e && e.message ? e.message : String(e))
                 this.pageNumber = '—'
             } finally {
                 this.loading = false
+                await logEvent('reader.loadBook.finally', 'loading=false')
             }
         },
         async loadChapter(chapterIndex, pageIndex) {
             if (!this.book || chapterIndex < 0 || chapterIndex >= this.chapters.length) return
+            await logEvent('reader.loadChapter.getChapter.begin', 'index=' + chapterIndex)
             const chapter = this.book.getChapter(chapterIndex)
             const text = chapter && chapter.text ? chapter.text : ''
+            await logEvent('reader.loadChapter.getChapter.done', 'textLength=' + text.length)
             if (!text) throw new Error('章节内容为空')
+            await logEvent('reader.loadChapter.paginate.begin', 'index=' + chapterIndex)
             const pages = this.book.paginateChapter(chapterIndex, this.paginationConfig())
+            await logEvent('reader.loadChapter.paginate.done', 'pageCount=' + (pages ? pages.length : 0))
             const pageTexts = []
             if (pages && pages.length) {
                 for (let i = 0; i < pages.length; i++) {

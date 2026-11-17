@@ -2,7 +2,7 @@
     <div class="reader-page">
         <div class="left-rail">
             <div class="rail-button back-button" @click="goBack">
-                <image class="material-icon" src="/assets/icons/arrow_back.svg" />
+                <image class="material-icon" src="/assets/icons/arrow_back.png" />
             </div>
         </div>
 
@@ -12,13 +12,13 @@
 
         <div class="right-rail reader-rail">
             <div class="rail-button" @click="previousPage">
-                <image class="material-icon" src="/assets/icons/chevron_left.svg" />
+                <image class="material-icon" src="/assets/icons/chevron_left.png" />
             </div>
             <div class="rail-button" @click="nextPage">
-                <image class="material-icon" src="/assets/icons/chevron_right.svg" />
+                <image class="material-icon" src="/assets/icons/chevron_right.png" />
             </div>
             <div class="rail-button" @click="toggleSettings">
-                <image class="material-icon" src="/assets/icons/settings.svg" />
+                <image class="material-icon" src="/assets/icons/settings.png" />
             </div>
         </div>
 
@@ -26,22 +26,22 @@
             <div class="settings-panel" @click.stop>
                 <div class="settings-header">
                     <text class="settings-title">阅读设置</text>
-                    <div class="settings-close" @click="closeSettings"><image class="material-icon" src="/assets/icons/close.svg" /></div>
+                    <div class="settings-close" @click="closeSettings"><image class="material-icon" src="/assets/icons/close.png" /></div>
                 </div>
                 <div class="setting-row">
                     <text class="setting-label">字号</text>
                     <div class="setting-stepper">
-                        <div class="setting-control" @click="changeFontSize(-1)"><image class="material-icon" src="/assets/icons/remove.svg" /></div>
+                        <div class="setting-control" @click="changeFontSize(-1)"><image class="material-icon" src="/assets/icons/remove.png" /></div>
                         <text class="setting-value">{{settings.fontSize}} px</text>
-                        <div class="setting-control" @click="changeFontSize(1)"><image class="material-icon" src="/assets/icons/add.svg" /></div>
+                        <div class="setting-control" @click="changeFontSize(1)"><image class="material-icon" src="/assets/icons/add.png" /></div>
                     </div>
                 </div>
                 <div class="setting-row">
                     <text class="setting-label">行距</text>
                     <div class="setting-stepper">
-                        <div class="setting-control" @click="changeLineHeight(-0.05)"><image class="material-icon" src="/assets/icons/remove.svg" /></div>
+                        <div class="setting-control" @click="changeLineHeight(-0.05)"><image class="material-icon" src="/assets/icons/remove.png" /></div>
                         <text class="setting-value">{{settings.lineHeight.toFixed(2)}} ×</text>
-                        <div class="setting-control" @click="changeLineHeight(0.05)"><image class="material-icon" src="/assets/icons/add.svg" /></div>
+                        <div class="setting-control" @click="changeLineHeight(0.05)"><image class="material-icon" src="/assets/icons/add.png" /></div>
                     </div>
                 </div>
             </div>

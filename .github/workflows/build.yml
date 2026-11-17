@@ -57,6 +57,17 @@ jobs:
       - name: Install project dependencies
         run: npm install --no-package-lock --no-audit --no-fund
 
+      - name: Install zig (pinned)
+        run: python3 -m pip install ziglang==0.17.1
+
+      - name: Rebuild native libs from source (ELF self-check included)
+        run: |
+          bash tools/build-core.sh
+          bash tools/build-fs-plugin.sh
+
+      - name: Check committed libs drift
+        run: python3 tools/check-lib-drift.py
+
       - name: Check project
         run: npm run check
 

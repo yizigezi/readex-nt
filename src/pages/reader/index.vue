@@ -12,7 +12,7 @@
 
         <div class="right-rail reader-rail">
             <div class="rail-button" @click="previousPage">
-                <image class="material-icon" src="/assets/icons/arrow_back.svg" />
+                <image class="material-icon" src="/assets/icons/chevron_left.svg" />
             </div>
             <div class="rail-button" @click="nextPage">
                 <image class="material-icon" src="/assets/icons/chevron_right.svg" />
@@ -39,9 +39,9 @@
                 <div class="setting-row">
                     <text class="setting-label">行距</text>
                     <div class="setting-stepper">
-                        <div class="setting-control" @click="changeLineHeight(-0.05)"><text class="settings-control-icon">−</text></div>
+                        <div class="setting-control" @click="changeLineHeight(-0.05)"><image class="material-icon" src="/assets/icons/remove.svg" /></div>
                         <text class="setting-value">{{settings.lineHeight.toFixed(2)}} ×</text>
-                        <div class="setting-control" @click="changeLineHeight(0.05)"><text class="settings-control-icon">＋</text></div>
+                        <div class="setting-control" @click="changeLineHeight(0.05)"><image class="material-icon" src="/assets/icons/add.svg" /></div>
                     </div>
                 </div>
             </div>

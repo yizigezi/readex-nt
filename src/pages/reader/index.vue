@@ -2,7 +2,7 @@
     <div class="reader-page">
         <div class="left-rail">
             <div class="rail-button back-button" @click="goBack">
-                <text class="rail-icon">‹</text>
+                <image class="material-icon" src="/assets/icons/arrow_back.svg" />
             </div>
         </div>
 
@@ -12,13 +12,13 @@
 
         <div class="right-rail reader-rail">
             <div class="rail-button" @click="previousPage">
-                <text class="rail-icon">‹</text>
+                <image class="material-icon" src="/assets/icons/arrow_back.svg" />
             </div>
             <div class="rail-button" @click="nextPage">
-                <text class="rail-icon">›</text>
+                <image class="material-icon" src="/assets/icons/chevron_right.svg" />
             </div>
             <div class="rail-button" @click="toggleSettings">
-                <text class="rail-icon">⚙</text>
+                <image class="material-icon" src="/assets/icons/settings.svg" />
             </div>
         </div>
 
@@ -26,14 +26,14 @@
             <div class="settings-panel" @click.stop>
                 <div class="settings-header">
                     <text class="settings-title">阅读设置</text>
-                    <div class="settings-close" @click="closeSettings"><text class="settings-control-icon">×</text></div>
+                    <div class="settings-close" @click="closeSettings"><image class="material-icon" src="/assets/icons/close.svg" /></div>
                 </div>
                 <div class="setting-row">
                     <text class="setting-label">字号</text>
                     <div class="setting-stepper">
-                        <div class="setting-control" @click="changeFontSize(-1)"><text class="settings-control-icon">−</text></div>
+                        <div class="setting-control" @click="changeFontSize(-1)"><image class="material-icon" src="/assets/icons/remove.svg" /></div>
                         <text class="setting-value">{{settings.fontSize}} px</text>
-                        <div class="setting-control" @click="changeFontSize(1)"><text class="settings-control-icon">＋</text></div>
+                        <div class="setting-control" @click="changeFontSize(1)"><image class="material-icon" src="/assets/icons/add.svg" /></div>
                     </div>
                 </div>
                 <div class="setting-row">

@@ -9,7 +9,7 @@ function formatError(error) {
     if (!error) return 'Unknown error'
     const message = error && error.message ? error.message : String(error)
     const stack = error && error.stack ? String(error.stack) : ''
-    return stack ? message + '\\n' + stack : message
+    return stack ? message + '\n' + stack : message
 }
 
 async function appendLine(line) {
@@ -25,7 +25,7 @@ async function appendLine(line) {
         // A failed read should not prevent creating a fresh diagnostic log.
     }
 
-    const next = (previous + line + '\\n').slice(-MAX_LOG_CHARS)
+    const next = (previous + line + '\n').slice(-MAX_LOG_CHARS)
     await fs.writeFile(LOG_PATH, next)
 }
 

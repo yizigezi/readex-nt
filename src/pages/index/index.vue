@@ -2,7 +2,7 @@
     <div class="home-page">
         <div class="left-rail">
             <div class="rail-button back-button" @click="goBack">
-                <text class="rail-icon">‹</text>
+                <image class="material-icon" src="/assets/icons/arrow_back.svg" />
             </div>
         </div>
 
@@ -33,8 +33,8 @@
                     @click="openEntry(entry)"
                 >
                     <div class="card-top">
-                        <text class="file-kind">{{entry.isDirectory ? '▰' : '▤'}}</text>
-                        <text class="rename-icon" v-if="!entry.isDirectory" @click.stop="startRename(entry)">✎</text>
+                        <image class="material-icon file-kind-icon" :src="entry.isDirectory ? '/assets/icons/folder.svg' : '/assets/icons/description.svg'" />
+                        <image class="material-icon rename-icon" v-if="!entry.isDirectory" src="/assets/icons/edit.svg" @click.stop="startRename(entry)" />
                     </div>
                     <text class="file-title">{{entry.title || entry.name}}</text>
                     <text class="file-meta" v-if="entry.isDirectory">文件夹</text>
@@ -44,13 +44,13 @@
 
         <div class="right-rail">
             <div class="rail-button" @click="toggleBrowse">
-                <text class="rail-icon">{{browseMode ? '◷' : '▱'}}</text>
+                <image class="material-icon" :src="browseMode ? '/assets/icons/history.svg' : '/assets/icons/folder_open.svg'" />
             </div>
             <div class="rail-button" @click="refresh">
-                <text class="rail-icon">⟳</text>
+                <image class="material-icon" src="/assets/icons/refresh.svg" />
             </div>
             <div class="rail-button" v-if="browseMode" @click="goParent">
-                <text class="rail-icon">↑</text>
+                <image class="material-icon" src="/assets/icons/arrow_upward.svg" />
             </div>
         </div>
 
@@ -59,8 +59,8 @@
                 <text class="dialog-title">设置书名</text>
                 <input class="rename-input" v-model="renameValue" placeholder="输入书名" />
                 <div class="dialog-actions">
-                    <div class="dialog-button" @click="cancelRename"><text class="dialog-button-icon">×</text></div>
-                    <div class="dialog-button" @click="saveRename"><text class="dialog-button-icon">✓</text></div>
+                    <div class="dialog-button" @click="cancelRename"><image class="material-icon" src="/assets/icons/close.svg" /></div>
+                    <div class="dialog-button" @click="saveRename"><image class="material-icon" src="/assets/icons/check.svg" /></div>
                 </div>
             </div>
         </div>

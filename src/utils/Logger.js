@@ -1,7 +1,7 @@
-import { getFs } from './FileSystem/FileSystem.js'
+import { execShell } from './FileSystem/FileSystem.js'
 
 export const LOG_PATH = '/userdisk/readex/app.log'
-const MAX_LOG_CHARS = 128 * 1024
+const MAX_LOG_BYTES = 128 * 1024
 
 let writeQueue = Promise.resolve()
 
@@ -9,24 +9,29 @@ function formatError(error) {
     if (!error) return 'Unknown error'
     const message = error && error.message ? error.message : String(error)
     const stack = error && error.stack ? String(error.stack) : ''
-    return stack ? message + '\n' + stack : message
+    return stack ? message + '\\n' + stack : message
+}
+
+function shellQuote(value) {
+    return "'" + String(value).replace(/'/g, "'\\''") + "'"
 }
 
 async function appendLine(line) {
-    const fs = await getFs()
-    await fs.mkdir('/userdisk/readex')
+    const path = shellQuote(LOG_PATH)
+    const directory = shellQuote('/userdisk/readex')
+    const temporary = shellQuote(LOG_PATH + '.tmp')
+    const command = [
+        'mkdir -p ' + directory,
+        "printf '%s\\n' " + shellQuote(line) + ' >> ' + path,
+        'if [ "$(wc -c < ' + path + ')" -gt ' + MAX_LOG_BYTES + ' ]; then',
+        '  tail -c ' + MAX_LOG_BYTES + ' ' + path + ' > ' + temporary,
+        '  mv ' + temporary + ' ' + path,
+        'fi'
+    ].join(' && ')
 
-    let previous = ''
-    try {
-        if (await fs.exists(LOG_PATH)) {
-            previous = String(await fs.readFile(LOG_PATH) || '')
-        }
-    } catch (error) {
-        // A failed read should not prevent creating a fresh diagnostic log.
-    }
-
-    const next = (previous + line + '\n').slice(-MAX_LOG_CHARS)
-    await fs.writeFile(LOG_PATH, next)
+    // Use the already-tested execShell bridge directly. The fs JSAPI differs
+    // between firmware builds and may expose readdir without writeFile/mkdir.
+    await execShell(command)
 }
 
 /**
@@ -34,9 +39,14 @@ async function appendLine(line) {
  * Writes are serialized so concurrent page events do not overwrite each other.
  */
 export function logEvent(stage, detail) {
-    const suffix = detail === undefined || detail === null
-        ? ''
-        : ' ' + (typeof detail === 'string' ? detail : JSON.stringify(detail))
+    let suffix = ''
+    if (detail !== undefined && detail !== null) {
+        try {
+            suffix = ' ' + (typeof detail === 'string' ? detail : JSON.stringify(detail))
+        } catch (error) {
+            suffix = ' [detail serialization failed: ' + String(error) + ']'
+        }
+    }
     const line = '[' + new Date().toISOString() + '] ' + String(stage) + suffix
 
     writeQueue = writeQueue.then(() => appendLine(line)).catch(error => {
@@ -51,3 +61,7 @@ export function logEvent(stage, detail) {
 export function logError(stage, error) {
     return logEvent(stage + ' ERROR', formatError(error))
 }
+
+// Create the log file as soon as this module is imported, even before a book
+// is selected. This also makes logger initialization failures observable.
+logEvent('logger.initialized', 'path=' + LOG_PATH)

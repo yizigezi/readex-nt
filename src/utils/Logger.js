@@ -1,7 +1,8 @@
-import { execShell } from './FileSystem/FileSystem.js'
+import { fs } from './FileSystem/FileSystem.js'
 
 export const LOG_PATH = '/userdisk/readex/app.log'
-const MAX_LOG_BYTES = 128 * 1024
+const LOG_DIR = '/userdisk/readex'
+const MAX_LOG_CHARS = 128 * 1024
 
 let writeQueue = Promise.resolve()
 
@@ -12,31 +13,31 @@ function formatError(error) {
     return stack ? message + '\\n' + stack : message
 }
 
-function shellQuote(value) {
-    return "'" + String(value).replace(/'/g, "'\\''") + "'"
-}
-
 async function appendLine(line) {
-    const path = shellQuote(LOG_PATH)
-    const directory = shellQuote('/userdisk/readex')
-    const temporary = shellQuote(LOG_PATH + '.tmp')
-    const command = [
-        'mkdir -p ' + directory,
-        "printf '%s\\n' " + shellQuote(line) + ' >> ' + path,
-        'if [ "$(wc -c < ' + path + ')" -gt ' + MAX_LOG_BYTES + ' ]; then',
-        '  tail -c ' + MAX_LOG_BYTES + ' ' + path + ' > ' + temporary,
-        '  mv ' + temporary + ' ' + path,
-        'fi'
-    ].join(' && ')
+    await fs.mkdir(LOG_DIR)
 
-    // Use the already-tested execShell bridge directly. The fs JSAPI differs
-    // between firmware builds and may expose readdir without writeFile/mkdir.
-    await execShell(command)
+    // The shell fallback returns a boolean from mkdir; verify the directory
+    // instead of silently treating a failed mkdir as a successful write.
+    if (!await fs.exists(LOG_DIR)) {
+        throw new Error('无法创建日志目录：' + LOG_DIR)
+    }
+
+    let previous = ''
+    if (await fs.exists(LOG_PATH)) {
+        previous = String(await fs.readFile(LOG_PATH) || '')
+    }
+
+    const next = (previous + line + '\\n').slice(-MAX_LOG_CHARS)
+    await fs.writeFile(LOG_PATH, next)
+
+    if (!await fs.exists(LOG_PATH)) {
+        throw new Error('日志文件写入后仍不存在：' + LOG_PATH)
+    }
 }
 
 /**
- * Append a timestamped diagnostic entry to /userdisk/readex/app.log.
- * Writes are serialized so concurrent page events do not overwrite each other.
+ * 使用项目自己的 FileSystem 适配层写入诊断日志。
+ * 所有写入串行执行，避免多个页面事件互相覆盖。
  */
 export function logEvent(stage, detail) {
     let suffix = ''
@@ -62,6 +63,5 @@ export function logError(stage, error) {
     return logEvent(stage + ' ERROR', formatError(error))
 }
 
-// Create the log file as soon as this module is imported, even before a book
-// is selected. This also makes logger initialization failures observable.
+// 模块加载时立即创建首条日志，不依赖用户先打开书籍。
 logEvent('logger.initialized', 'path=' + LOG_PATH)

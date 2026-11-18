@@ -52,6 +52,32 @@ export async function loadBookCatalog() {
     return { books, recent }
 }
 
+export async function getBookProgress(path) {
+    if (!path) return null
+    const catalog = await loadBookCatalog()
+    const book = catalog.books[path]
+    const progress = book && book.progress
+    if (!progress || typeof progress !== 'object') return null
+    return {
+        chapterIndex: Math.max(0, Math.floor(Number(progress.chapterIndex) || 0)),
+        pageIndex: Math.max(0, Math.floor(Number(progress.pageIndex) || 0))
+    }
+}
+
+export async function saveBookProgress(path, progress) {
+    if (!path || !progress || typeof progress !== 'object') return null
+    const catalog = await loadBookCatalog()
+    const old = catalog.books[path] || {}
+    const saved = {
+        chapterIndex: Math.max(0, Math.floor(Number(progress.chapterIndex) || 0)),
+        pageIndex: Math.max(0, Math.floor(Number(progress.pageIndex) || 0)),
+        updatedAt: Date.now()
+    }
+    catalog.books[path] = Object.assign({}, old, { progress: saved })
+    await writeJson(BOOKS_PATH, catalog)
+    return saved
+}
+
 export async function recordBookOpen(path, fallbackTitle) {
     const catalog = await loadBookCatalog()
     const old = catalog.books[path] || {}

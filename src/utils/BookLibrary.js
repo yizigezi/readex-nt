@@ -81,10 +81,10 @@ export async function saveBookProgress(path, progress) {
 export async function recordBookOpen(path, fallbackTitle) {
     const catalog = await loadBookCatalog()
     const old = catalog.books[path] || {}
-    catalog.books[path] = {
+    catalog.books[path] = Object.assign({}, old, {
         title: old.title || fallbackTitle || fileName(path),
         lastOpened: Date.now()
-    }
+    })
     catalog.recent = [path].concat(catalog.recent.filter(item => item !== path)).slice(0, 20)
     await writeJson(BOOKS_PATH, catalog)
     return catalog

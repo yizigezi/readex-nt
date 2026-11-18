@@ -20,6 +20,55 @@
             <div class="rail-button" @click="toggleSettings">
                 <image class="material-icon" src="/assets/icons/settings.png" />
             </div>
+            <div class="rail-button" @click="toggleNativeDebug">
+                <image class="material-icon" src="/assets/icons/description.png" />
+            </div>
+        </div>
+
+        <div class="native-debug-mask" v-if="nativeDebugVisible">
+            <div class="native-debug-panel">
+                <div class="native-debug-header">
+                    <div class="native-debug-heading">
+                        <text class="native-debug-title">原生模块诊断</text>
+                        <text class="native-debug-status">{{nativeModuleStatus}}</text>
+                    </div>
+                    <div class="native-debug-actions">
+                        <div class="debug-action" @click="refreshNativeDebug">
+                            <image class="material-icon" src="/assets/icons/refresh.png" />
+                        </div>
+                        <div class="debug-action" @click="toggleNativeDebug">
+                            <image class="material-icon" src="/assets/icons/close.png" />
+                        </div>
+                    </div>
+                </div>
+                <div class="native-debug-info">
+                    <div class="native-debug-item">
+                        <text class="native-debug-label">模块版本</text>
+                        <text class="native-debug-value">{{nativeInfo.version || '—'}}</text>
+                    </div>
+                    <div class="native-debug-item">
+                        <text class="native-debug-label">QuickJS</text>
+                        <text class="native-debug-value">{{nativeInfo.quickjs || '—'}}</text>
+                    </div>
+                    <div class="native-debug-item">
+                        <text class="native-debug-label">平台 / 构建</text>
+                        <text class="native-debug-value">{{nativeInfo.platform || '—'}} / {{nativeInfo.buildMode || '—'}}</text>
+                    </div>
+                    <div class="native-debug-item">
+                        <text class="native-debug-label">API</text>
+                        <text class="native-debug-value">{{nativeApiSummary}}</text>
+                    </div>
+                    <div class="native-debug-item">
+                        <text class="native-debug-label">当前 Book</text>
+                        <text class="native-debug-value">{{book ? '已打开' : '未打开'}} · {{chapters.length}} 章</text>
+                    </div>
+                </div>
+                <text class="native-debug-log-title">原生日志 · app.native.log</text>
+                <scroller class="native-debug-log-scroll" scroll-direction="vertical" show-scrollbar="false">
+                    <text class="native-debug-log-line" v-for="(line, index) in nativeLogLines" :key="index">{{line}}</text>
+                </scroller>
+                <text class="native-debug-error" v-if="nativeDebugError">{{nativeDebugError}}</text>
+            </div>
         </div>
 
         <div class="settings-mask" v-if="settingsVisible" @click="closeSettings">
@@ -51,6 +100,7 @@
 
 <script>
 import { getCurrentBookPath } from '../../utils/BookSession.js'
+import { fs } from '../../utils/FileSystem/FileSystem.js'
 import { logEvent, logError } from '../../utils/Logger.js'
 import {
     loadSettings,
@@ -105,6 +155,13 @@ export default {
             bookTitle: '',
             settings: { fontSize: 17, lineHeight: 1.55 },
             settingsVisible: false,
+            nativeDebugVisible: false,
+            nativeModuleStatus: '尚未检测',
+            nativeInfo: {},
+            nativeApiSummary: '—',
+            nativeLogLines: ['等待读取原生日志…'],
+            nativeDebugError: '',
+            nativeDebugRefreshing: false,
             loading: false
         }
     },
@@ -268,6 +325,51 @@ export default {
         toggleSettings() {
             this.settingsVisible = !this.settingsVisible
         },
+        async toggleNativeDebug() {
+            this.nativeDebugVisible = !this.nativeDebugVisible
+            if (this.nativeDebugVisible) await this.refreshNativeDebug()
+        },
+        async refreshNativeDebug() {
+            if (this.nativeDebugRefreshing) return
+            this.nativeDebugRefreshing = true
+            this.nativeDebugError = ''
+            this.nativeModuleStatus = '正在检测…'
+            try {
+                const Readex = await loadReadex()
+                if (!Readex) throw new Error('readex 模块导入结果为空')
+                this.nativeModuleStatus = '模块已加载'
+                this.nativeInfo = typeof Readex.info === 'function' ? (Readex.info() || {}) : {}
+                this.nativeApiSummary = [
+                    'openBook:' + (typeof Readex.openBook === 'function' ? 'OK' : '缺失'),
+                    'paginate:' + (typeof Readex.paginate === 'function' ? 'OK' : '缺失'),
+                    'closeAllBooks:' + (typeof Readex.closeAllBooks === 'function' ? 'OK' : '缺失')
+                ].join('  ')
+            } catch (error) {
+                this.nativeModuleStatus = '模块不可用'
+                this.nativeInfo = {}
+                this.nativeApiSummary = '不可读取'
+                this.nativeDebugError = '模块检测失败：' + (error && error.message ? error.message : String(error))
+                await logError('reader.nativeDebug.module', error)
+            }
+            try {
+                const path = '/userdisk/readex/app.native.log'
+                if (await fs.exists(path)) {
+                    const content = String(await fs.readFile(path) || '')
+                    const lines = content.split(/\r?\n/).filter(Boolean)
+                    this.nativeLogLines = lines.slice(-24)
+                    if (!this.nativeLogLines.length) this.nativeLogLines = ['原生日志文件为空']
+                } else {
+                    this.nativeLogLines = ['尚未生成 app.native.log', '日志路径：' + path]
+                }
+            } catch (error) {
+                this.nativeLogLines = ['读取原生日志失败']
+                this.nativeDebugError = (this.nativeDebugError ? this.nativeDebugError + '；' : '') +
+                    (error && error.message ? error.message : String(error))
+                await logError('reader.nativeDebug.log', error)
+            } finally {
+                this.nativeDebugRefreshing = false
+            }
+        },
         closeSettings() {
             this.settingsVisible = false
         },
@@ -304,4 +406,116 @@ export default {
 
 <style lang="less">
 @import '../../styles/common.less';
+
+.native-debug-mask {
+    position: absolute;
+    left: 76px;
+    right: 84px;
+    top: 8px;
+    bottom: 8px;
+    z-index: 30;
+}
+
+.native-debug-panel {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    padding: 10px 14px;
+    background-color: #17191d;
+    border: 1px solid #41454d;
+    display: flex;
+    flex-direction: column;
+}
+
+.native-debug-header,
+.native-debug-actions,
+.native-debug-info,
+.native-debug-item {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+}
+
+.native-debug-header {
+    justify-content: space-between;
+    min-height: 28px;
+}
+
+.native-debug-heading {
+    display: flex;
+    flex-direction: row;
+    align-items: baseline;
+}
+
+.native-debug-title {
+    color: #f2f3f5;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.native-debug-status {
+    color: #a9c7ff;
+    font-size: 11px;
+    margin-left: 12px;
+}
+
+.native-debug-actions {
+    gap: 12px;
+}
+
+.debug-action {
+    width: 30px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.native-debug-info {
+    flex-wrap: wrap;
+    margin-top: 6px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #383c43;
+}
+
+.native-debug-item {
+    width: 50%;
+    min-height: 22px;
+}
+
+.native-debug-label {
+    color: #9299a5;
+    font-size: 11px;
+    width: 76px;
+}
+
+.native-debug-value {
+    color: #e0e3e8;
+    font-size: 11px;
+    flex: 1;
+}
+
+.native-debug-log-title {
+    color: #c4cad4;
+    font-size: 11px;
+    margin-top: 5px;
+    margin-bottom: 3px;
+}
+
+.native-debug-log-scroll {
+    flex: 1;
+    min-height: 0;
+}
+
+.native-debug-log-line {
+    color: #c4cbd5;
+    font-size: 10px;
+    line-height: 13px;
+}
+
+.native-debug-error {
+    color: #ffb4ab;
+    font-size: 10px;
+    margin-top: 3px;
+}
 </style>

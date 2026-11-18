@@ -263,7 +263,27 @@ export default {
                     found: !!savedProgress
                 })
                 await logEvent('reader.loadBook.loadChapter.begin', 'index=' + chapterIndex)
-                await this.loadChapter(chapterIndex, pageIndex)
+                await this.loadChapter(chapterIndex, 0)
+                if (savedProgress && this.pageOffsets.length &&
+                    typeof this.book.setProgress === 'function' &&
+                    typeof this.book.locatePage === 'function') {
+                    try {
+                        this.book.setProgress({
+                            chapterIndex,
+                            textOffset: savedProgress.textOffset || 0,
+                            pageIndex
+                        })
+                        this.currentPage = this.book.locatePage(this.pageOffsets)
+                        this.updatePage()
+                    } catch (restoreError) {
+                        await logError('reader.loadBook.restoreNativeProgress', restoreError)
+                        this.currentPage = Math.max(0, Math.min(pageIndex, this.pageTexts.length - 1))
+                        this.updatePage()
+                    }
+                } else if (savedProgress) {
+                    this.currentPage = Math.max(0, Math.min(pageIndex, this.pageTexts.length - 1))
+                    this.updatePage()
+                }
                 await this.saveProgress()
                 await logEvent('reader.loadBook.done', 'chapters=' + chapters.length)
             } catch (e) {
@@ -346,17 +366,19 @@ export default {
         },
         async saveProgress() {
             if (!this.bookPath || !this.book) return
+            const page = this.pageOffsets[this.currentPage]
+            const textOffset = page ? Math.max(0, Number(page.startOffset) || 0) : 0
             const progress = {
                 chapterIndex: this.currentChapter,
-                pageIndex: this.currentPage
+                pageIndex: this.currentPage,
+                textOffset
             }
             try {
                 await saveBookProgress(this.bookPath, progress)
                 if (typeof this.book.setProgress === 'function') {
-                    const page = this.pageOffsets[this.currentPage]
                     this.book.setProgress({
                         chapterIndex: this.currentChapter,
-                        textOffset: page ? Math.max(0, Number(page.startOffset) || 0) : 0,
+                        textOffset,
                         pageIndex: this.currentPage
                     })
                 }

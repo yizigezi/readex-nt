@@ -106,7 +106,9 @@ import {
     loadSettings,
     saveSettings,
     loadBookCatalog,
-    displayBookTitle
+    displayBookTitle,
+    getBookProgress,
+    saveBookProgress
 } from '../../utils/BookLibrary.js'
 
 const SCREEN_WIDTH = 800
@@ -147,6 +149,7 @@ export default {
             pageText: '正在打开本地书籍…',
             pageNumber: '—',
             pageTexts: [],
+            pageOffsets: [],
             currentPage: 0,
             currentChapter: 0,
             chapters: [],
@@ -176,6 +179,9 @@ export default {
     onShow() {
         this.loadBook()
     },
+    onHide() {
+        this.saveProgress()
+    },
     methods: {
         paginationConfig() {
             return {
@@ -191,15 +197,10 @@ export default {
             }
         },
         async loadBook() {
-            const path = getCurrentBookPath()
-            await logEvent('reader.loadBook.start', 'path=' + (path || '<empty>'))
-            if (!path) {
-                this.pageText = '没有选择书籍，请返回首页。'
-                await logEvent('reader.loadBook.abort', 'no book path')
-                return
-            }
+            let path = getCurrentBookPath()
+            await logEvent('reader.loadBook.start', 'sessionPath=' + (path || '<empty>'))
             this.loading = true
-            this.bookPath = path
+            if (path) this.bookPath = path
             this.pageText = '正在读取本地文件…'
             this.pageTexts = []
             this.currentPage = 0
@@ -211,8 +212,14 @@ export default {
 
                 await logEvent('reader.loadBook.loadCatalog.begin')
                 const catalog = await loadBookCatalog()
+                if (!path && catalog.recent.length) {
+                    path = catalog.recent[0]
+                    await logEvent('reader.loadBook.pathFallback', 'recent=' + path)
+                }
+                if (!path) throw new Error('没有收到书籍路径，最近阅读记录中也没有可恢复的书籍')
+                this.bookPath = path
                 this.bookTitle = displayBookTitle(catalog, path)
-                await logEvent('reader.loadBook.loadCatalog.done', 'title=' + this.bookTitle)
+                await logEvent('reader.loadBook.loadCatalog.done', 'path=' + path + ' title=' + this.bookTitle)
 
                 await logEvent('reader.loadBook.importReadex.begin')
                 const Readex = await loadReadex()
@@ -245,9 +252,19 @@ export default {
                 openedBook = null
                 this.bookTitle = this.bookTitle || (info && info.title) || path
                 this.chapters = chapters
-                this.currentChapter = 0
-                await logEvent('reader.loadBook.loadChapter.begin', 'index=0')
-                await this.loadChapter(0, 0)
+                const savedProgress = await getBookProgress(path)
+                const chapterIndex = savedProgress
+                    ? Math.min(savedProgress.chapterIndex, chapters.length - 1)
+                    : 0
+                const pageIndex = savedProgress ? savedProgress.pageIndex : 0
+                await logEvent('reader.loadBook.restoreProgress', {
+                    chapterIndex,
+                    pageIndex,
+                    found: !!savedProgress
+                })
+                await logEvent('reader.loadBook.loadChapter.begin', 'index=' + chapterIndex)
+                await this.loadChapter(chapterIndex, pageIndex)
+                await this.saveProgress()
                 await logEvent('reader.loadBook.done', 'chapters=' + chapters.length)
             } catch (e) {
                 await logError('reader.loadBook', e)
@@ -283,6 +300,7 @@ export default {
             }
             if (pageTexts.length === 0) pageTexts.push(text)
             this.currentChapter = chapterIndex
+            this.pageOffsets = pages || []
             this.pageTexts = pageTexts
             this.currentPage = Math.max(0, Math.min(Number(pageIndex) || 0, pageTexts.length - 1))
             this.updatePage()
@@ -296,6 +314,7 @@ export default {
             if (this.currentPage > 0) {
                 this.currentPage--
                 this.updatePage()
+                await this.saveProgress()
                 return
             }
             if (this.currentChapter > 0) {
@@ -303,6 +322,7 @@ export default {
                     await this.loadChapter(this.currentChapter - 1, 0)
                     this.currentPage = this.pageTexts.length - 1
                     this.updatePage()
+                    await this.saveProgress()
                 } catch (e) {
                     this.pageText = '上一章加载失败：' + (e && e.message ? e.message : String(e))
                 }
@@ -312,14 +332,36 @@ export default {
             if (this.currentPage < this.pageTexts.length - 1) {
                 this.currentPage++
                 this.updatePage()
+                await this.saveProgress()
                 return
             }
             if (this.currentChapter < this.chapters.length - 1) {
                 try {
                     await this.loadChapter(this.currentChapter + 1, 0)
+                    await this.saveProgress()
                 } catch (e) {
                     this.pageText = '下一章加载失败：' + (e && e.message ? e.message : String(e))
                 }
+            }
+        },
+        async saveProgress() {
+            if (!this.bookPath || !this.book) return
+            const progress = {
+                chapterIndex: this.currentChapter,
+                pageIndex: this.currentPage
+            }
+            try {
+                await saveBookProgress(this.bookPath, progress)
+                if (typeof this.book.setProgress === 'function') {
+                    const page = this.pageOffsets[this.currentPage]
+                    this.book.setProgress({
+                        chapterIndex: this.currentChapter,
+                        textOffset: page ? Math.max(0, Number(page.startOffset) || 0) : 0,
+                        pageIndex: this.currentPage
+                    })
+                }
+            } catch (error) {
+                await logError('reader.saveProgress', error)
             }
         },
         toggleSettings() {
@@ -393,7 +435,8 @@ export default {
                 this.pageText = '保存设置失败：' + (e && e.message ? e.message : String(e))
             }
         },
-        goBack() {
+        async goBack() {
+            await this.saveProgress()
             if (this.book && typeof this.book.close === 'function') {
                 try { this.book.close() } catch (e) {}
                 this.book = null

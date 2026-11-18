@@ -1,4 +1,5 @@
 import { BasePage } from './base-page.js'
+import { logEvent, logError } from './utils/Logger.js'
 
 class App extends $falcon.App {
   constructor() {
@@ -7,19 +8,23 @@ class App extends $falcon.App {
 
   onLaunch(options) {
     super.onLaunch(options)
+    logEvent('app.launch', 'UI logger initialized')
     $falcon.useDefaultBasePageClass(BasePage)
   }
 
   onShow() {
     super.onShow()
+    logEvent('app.show')
   }
 
   onHide() {
     super.onHide()
+    logEvent('app.hide')
   }
 
   onDestroy() {
     super.onDestroy()
+    logEvent('app.destroy')
   }
 }
 

@@ -360,11 +360,14 @@ JSValue js_open_book(JSContext* ctx, JSValueConst this_val, int argc,
 
     BookHandle* h = new BookHandle{ 0 }; // bad_alloc 走护栏，无资源可泄
 
+    readex_native_log::write("INFO", "book.open.begin", path.c_str());
     readex::Result<readex::Book> res = readex::openBook(path);
     if (!res.ok()) {
+        readex_native_log::write("ERROR", "book.open.failed", res.error().toString().c_str());
         delete h;
         return JS_Throw(ctx, make_js_error(ctx, res.error()));
     }
+    readex_native_log::write("INFO", "book.open.success", path.c_str());
     uint32_t id = registry().add(std::move(res.value()));
     if (id == 0) {
         delete h;

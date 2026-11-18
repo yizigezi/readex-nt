@@ -203,6 +203,7 @@ export default {
             if (path) this.bookPath = path
             this.pageText = '正在读取本地文件…'
             this.pageTexts = []
+            this.pageOffsets = []
             this.currentPage = 0
             let openedBook = null
             try {

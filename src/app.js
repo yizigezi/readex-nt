@@ -36,7 +36,7 @@ try {
     cancelAnimationFrame
   }
 } catch (err) {
-  console.log(err)
+  logError('global.window.init', err)
 }
 
 try {
@@ -46,7 +46,7 @@ try {
     }
   }
 } catch (err) {
-  console.log(err)
+  logError('global.process.init', err)
 }
 
 export default App

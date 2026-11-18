@@ -60,7 +60,8 @@ export async function getBookProgress(path) {
     if (!progress || typeof progress !== 'object') return null
     return {
         chapterIndex: Math.max(0, Math.floor(Number(progress.chapterIndex) || 0)),
-        pageIndex: Math.max(0, Math.floor(Number(progress.pageIndex) || 0))
+        pageIndex: Math.max(0, Math.floor(Number(progress.pageIndex) || 0)),
+        textOffset: Math.max(0, Math.floor(Number(progress.textOffset) || 0))
     }
 }
 
@@ -71,6 +72,7 @@ export async function saveBookProgress(path, progress) {
     const saved = {
         chapterIndex: Math.max(0, Math.floor(Number(progress.chapterIndex) || 0)),
         pageIndex: Math.max(0, Math.floor(Number(progress.pageIndex) || 0)),
+        textOffset: Math.max(0, Math.floor(Number(progress.textOffset) || 0)),
         updatedAt: Date.now()
     }
     catalog.books[path] = Object.assign({}, old, { progress: saved })

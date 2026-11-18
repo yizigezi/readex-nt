@@ -1,6 +1,6 @@
 import { fs } from './FileSystem/FileSystem.js'
 
-export const LOG_PATH = '/userdisk/readex/app.log'
+export const LOG_PATH = '/userdisk/readex/app.ui.log'
 const LOG_DIR = '/userdisk/readex'
 const MAX_LOG_CHARS = 128 * 1024
 

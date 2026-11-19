@@ -197,9 +197,10 @@ export default {
             }
         },
         async loadBook() {
-            let path = getCurrentBookPath()
-            await logEvent('reader.loadBook.start', 'sessionPath=' + (path || '<empty>'))
+            if (this.loading) return
             this.loading = true
+            let path = getCurrentBookPath()
+            logEvent('reader.loadBook.start', 'sessionPath=' + (path || '<empty>'))
             if (path) this.bookPath = path
             this.pageText = '正在读取本地文件…'
             this.pageTexts = []
@@ -207,24 +208,24 @@ export default {
             this.currentPage = 0
             let openedBook = null
             try {
-                await logEvent('reader.loadBook.loadSettings.begin')
+                logEvent('reader.loadBook.loadSettings.begin')
                 this.settings = await loadSettings()
-                await logEvent('reader.loadBook.loadSettings.done', this.settings)
+                logEvent('reader.loadBook.loadSettings.done', this.settings)
 
-                await logEvent('reader.loadBook.loadCatalog.begin')
+                logEvent('reader.loadBook.loadCatalog.begin')
                 const catalog = await loadBookCatalog()
                 if (!path && catalog.recent.length) {
                     path = catalog.recent[0]
-                    await logEvent('reader.loadBook.pathFallback', 'recent=' + path)
+                    logEvent('reader.loadBook.pathFallback', 'recent=' + path)
                 }
                 if (!path) throw new Error('没有收到书籍路径，最近阅读记录中也没有可恢复的书籍')
                 this.bookPath = path
                 this.bookTitle = displayBookTitle(catalog, path)
-                await logEvent('reader.loadBook.loadCatalog.done', 'path=' + path + ' title=' + this.bookTitle)
+                logEvent('reader.loadBook.loadCatalog.done', 'path=' + path + ' title=' + this.bookTitle)
 
-                await logEvent('reader.loadBook.importReadex.begin')
+                logEvent('reader.loadBook.importReadex.begin')
                 const Readex = await loadReadex()
-                await logEvent('reader.loadBook.importReadex.done', 'available=' + !!Readex)
+                logEvent('reader.loadBook.importReadex.done', 'available=' + !!Readex)
                 if (!Readex || typeof Readex.openBook !== 'function') {
                     throw new Error('Readex 原生模块未加载，请确认 libjsapi_readex.so 已安装')
                 }
@@ -232,17 +233,17 @@ export default {
                 // openBook is synchronous and may scan the entire file. The
                 // "begin" entry is flushed before entering native code so a
                 // hang can be distinguished from later chapter/pagination work.
-                await logEvent('reader.loadBook.openBook.begin', 'path=' + path)
+                logEvent('reader.loadBook.openBook.begin', 'path=' + path)
                 openedBook = Readex.openBook(path)
-                await logEvent('reader.loadBook.openBook.done')
+                logEvent('reader.loadBook.openBook.done')
 
-                await logEvent('reader.loadBook.getInfo.begin')
+                logEvent('reader.loadBook.getInfo.begin')
                 const info = openedBook.getInfo()
-                await logEvent('reader.loadBook.getInfo.done', info && info.title)
+                logEvent('reader.loadBook.getInfo.done', info && info.title)
 
-                await logEvent('reader.loadBook.getChapters.begin')
+                logEvent('reader.loadBook.getChapters.begin')
                 const chapters = openedBook.getChapters()
-                await logEvent('reader.loadBook.getChapters.done', 'count=' + (chapters ? chapters.length : 0))
+                logEvent('reader.loadBook.getChapters.done', 'count=' + (chapters ? chapters.length : 0))
                 if (!chapters || chapters.length === 0) {
                     throw new Error('文件中没有可读取的章节')
                 }
@@ -258,12 +259,12 @@ export default {
                     ? Math.min(savedProgress.chapterIndex, chapters.length - 1)
                     : 0
                 const pageIndex = savedProgress ? savedProgress.pageIndex : 0
-                await logEvent('reader.loadBook.restoreProgress', {
+                logEvent('reader.loadBook.restoreProgress', {
                     chapterIndex,
                     pageIndex,
                     found: !!savedProgress
                 })
-                await logEvent('reader.loadBook.loadChapter.begin', 'index=' + chapterIndex)
+                logEvent('reader.loadBook.loadChapter.begin', 'index=' + chapterIndex)
                 await this.loadChapter(chapterIndex, 0)
                 if (savedProgress && this.pageOffsets.length &&
                     typeof this.book.setProgress === 'function' &&
@@ -277,7 +278,7 @@ export default {
                         this.currentPage = this.book.locatePage(this.pageOffsets)
                         this.updatePage()
                     } catch (restoreError) {
-                        await logError('reader.loadBook.restoreNativeProgress', restoreError)
+                        logError('reader.loadBook.restoreNativeProgress', restoreError)
                         this.currentPage = Math.max(0, Math.min(pageIndex, this.pageTexts.length - 1))
                         this.updatePage()
                     }
@@ -286,36 +287,53 @@ export default {
                     this.updatePage()
                 }
                 await this.saveProgress()
-                await logEvent('reader.loadBook.done', 'chapters=' + chapters.length)
+                logEvent('reader.loadBook.done', 'chapters=' + chapters.length)
             } catch (e) {
-                await logError('reader.loadBook', e)
+                logError('reader.loadBook', e)
                 if (openedBook && typeof openedBook.close === 'function') {
                     try { openedBook.close() } catch (closeError) {
-                        await logError('reader.loadBook.close', closeError)
+                        logError('reader.loadBook.close', closeError)
                     }
                 }
                 this.pageText = '打开失败：' + (e && e.message ? e.message : String(e))
                 this.pageNumber = '—'
             } finally {
                 this.loading = false
-                await logEvent('reader.loadBook.finally', 'loading=false')
+                logEvent('reader.loadBook.finally', 'loading=false')
             }
         },
         async loadChapter(chapterIndex, pageIndex) {
             if (!this.book || chapterIndex < 0 || chapterIndex >= this.chapters.length) return
-            await logEvent('reader.loadChapter.getChapter.begin', 'index=' + chapterIndex)
+            logEvent('reader.loadChapter.getChapter.begin', 'index=' + chapterIndex)
             const chapter = this.book.getChapter(chapterIndex)
             const text = chapter && chapter.text ? chapter.text : ''
-            await logEvent('reader.loadChapter.getChapter.done', 'textLength=' + text.length)
+            logEvent('reader.loadChapter.getChapter.done', 'textLength=' + text.length)
             if (!text) throw new Error('章节内容为空')
-            await logEvent('reader.loadChapter.paginate.begin', 'index=' + chapterIndex)
+            logEvent('reader.loadChapter.paginate.begin', 'index=' + chapterIndex)
             const pages = this.book.paginateChapter(chapterIndex, this.paginationConfig())
-            await logEvent('reader.loadChapter.paginate.done', 'pageCount=' + (pages ? pages.length : 0))
+            logEvent('reader.loadChapter.paginate.done', 'pageCount=' + (pages ? pages.length : 0))
             const pageTexts = []
             if (pages && pages.length) {
+                // 页偏移按文本顺序递增；维护一个 UTF-8 字节游标和字符串游标，
+                // 整章最多扫描一次，避免每页从字符串开头重复计算。
+                let stringIndex = 0
+                let byteIndex = 0
+                const advanceTo = targetOffset => {
+                    const target = Math.max(0, Number(targetOffset) || 0)
+                    while (stringIndex < text.length && byteIndex < target) {
+                        const cp = text.codePointAt(stringIndex)
+                        let byteLength = 1
+                        if (cp > 0x7F && cp <= 0x7FF) byteLength = 2
+                        else if (cp > 0x7FF && cp <= 0xFFFF) byteLength = 3
+                        else if (cp > 0xFFFF) byteLength = 4
+                        byteIndex += byteLength
+                        stringIndex += cp > 0xFFFF ? 2 : 1
+                    }
+                    return stringIndex
+                }
                 for (let i = 0; i < pages.length; i++) {
-                    const start = byteOffsetToStringIndex(text, pages[i].startOffset)
-                    const end = byteOffsetToStringIndex(text, pages[i].endOffset)
+                    const start = advanceTo(pages[i].startOffset)
+                    const end = advanceTo(pages[i].endOffset)
                     pageTexts.push(text.substring(start, end))
                 }
             }
@@ -384,7 +402,7 @@ export default {
                     })
                 }
             } catch (error) {
-                await logError('reader.saveProgress', error)
+                logError('reader.saveProgress', error)
             }
         },
         toggleSettings() {
@@ -414,7 +432,7 @@ export default {
                 this.nativeInfo = {}
                 this.nativeApiSummary = '不可读取'
                 this.nativeDebugError = '模块检测失败：' + (error && error.message ? error.message : String(error))
-                await logError('reader.nativeDebug.module', error)
+                logError('reader.nativeDebug.module', error)
             }
             try {
                 const path = '/userdisk/readex/app.native.log'
@@ -430,7 +448,7 @@ export default {
                 this.nativeLogLines = ['读取原生日志失败']
                 this.nativeDebugError = (this.nativeDebugError ? this.nativeDebugError + '；' : '') +
                     (error && error.message ? error.message : String(error))
-                await logError('reader.nativeDebug.log', error)
+                logError('reader.nativeDebug.log', error)
             } finally {
                 this.nativeDebugRefreshing = false
             }

@@ -1,103 +1,528 @@
 <template>
-    <div class="reader-page">
-        <!--
-            阅读页毛坯（PR-4）：最小阅读区占位。
-            关键接线：可用阅读区域宽高【显式】传给 Readex.paginate（config.width/
-            height），引擎不再从屏幕比例反推工具栏宽度（修「内容挤在屏幕左侧」的
-            根子）。当前是毛坯级验证通路，不声称真机效果；真机验收（内容不再挤在
-            左侧）由主人在 X5 上做。
-        -->
-        <div class="reader-area">
-            <text class="reader-text">{{pageText}}</text>
+    <div class="reader-page" :style="{flexDirection: 'row'}">
+        <div class="left-rail">
+            <div class="rail-button back-button" @click="goBack">
+                <image class="material-icon" src="/assets/icons/arrow_back.png" />
+            </div>
         </div>
-        <div class="reader-status">
-            <text class="status-text">{{status}}</text>
+
+        <div class="center-content reader-center">
+            <text class="reader-text" :style="readerTextStyle">{{pageText}}</text>
+        </div>
+
+        <div class="right-rail">
+            <div class="rail-button" @click="previousPage">
+                <image class="material-icon" src="/assets/icons/chevron_left.png" />
+            </div>
+            <div class="rail-button" @click="nextPage">
+                <image class="material-icon" src="/assets/icons/chevron_right.png" />
+            </div>
+            <div class="rail-button" @click="toggleSettings">
+                <image class="material-icon" src="/assets/icons/settings.png" />
+            </div>
+            <div class="rail-button" @click="toggleNativeDebug">
+                <image class="material-icon" src="/assets/icons/description.png" />
+            </div>
+        </div>
+
+        <div class="native-debug-mask" v-if="nativeDebugVisible">
+            <div class="native-debug-panel">
+                <div class="native-debug-header">
+                    <div class="native-debug-heading">
+                        <text class="native-debug-title">原生模块诊断</text>
+                        <text class="native-debug-status">{{nativeModuleStatus}}</text>
+                    </div>
+                    <div class="native-debug-actions">
+                        <div class="debug-action" @click="refreshNativeDebug">
+                            <image class="material-icon" src="/assets/icons/refresh.png" />
+                        </div>
+                        <div class="debug-action" @click="toggleNativeDebug">
+                            <image class="material-icon" src="/assets/icons/close.png" />
+                        </div>
+                    </div>
+                </div>
+                <div class="native-debug-info">
+                    <div class="native-debug-item">
+                        <text class="native-debug-label">提交版本</text>
+                        <text class="native-debug-value">{{buildInfo.commitShort}}</text>
+                    </div>
+                    <div class="native-debug-item">
+                        <text class="native-debug-label">构建编号</text>
+                        <text class="native-debug-value">{{buildInfo.runNumber}}</text>
+                    </div>
+                    <div class="native-debug-item">
+                        <text class="native-debug-label">构建分支</text>
+                        <text class="native-debug-value">{{buildInfo.branch}}</text>
+                    </div>
+                    <div class="native-debug-item">
+                        <text class="native-debug-label">构建时间</text>
+                        <text class="native-debug-value">{{buildInfo.builtAt}}</text>
+                    </div>
+                    <div class="native-debug-item">
+                        <text class="native-debug-label">原生库构建</text>
+                        <text class="native-debug-value">{{buildInfo.nativeBuiltAt}}</text>
+                    </div>
+                    <div class="native-debug-item">
+                        <text class="native-debug-label">构建触发</text>
+                        <text class="native-debug-value">{{buildInfo.event}}</text>
+                    </div>
+                    <div class="native-debug-item">
+                        <text class="native-debug-label">工作流</text>
+                        <text class="native-debug-value">{{buildInfo.workflow}}</text>
+                    </div>
+                    <div class="native-debug-item">
+                        <text class="native-debug-label">模块版本</text>
+                        <text class="native-debug-value">{{nativeInfo.version || '—'}}</text>
+                    </div>
+                    <div class="native-debug-item">
+                        <text class="native-debug-label">QuickJS</text>
+                        <text class="native-debug-value">{{nativeInfo.quickjs || '—'}}</text>
+                    </div>
+                    <div class="native-debug-item">
+                        <text class="native-debug-label">平台 / 构建</text>
+                        <text class="native-debug-value">{{nativeInfo.platform || '—'}} / {{nativeInfo.buildMode || '—'}}</text>
+                    </div>
+                    <div class="native-debug-item">
+                        <text class="native-debug-label">API</text>
+                        <text class="native-debug-value">{{nativeApiSummary}}</text>
+                    </div>
+                    <div class="native-debug-item">
+                        <text class="native-debug-label">当前 Book</text>
+                        <text class="native-debug-value">{{book ? '已打开' : '未打开'}} · {{chapters.length}} 章</text>
+                    </div>
+                </div>
+                <text class="native-debug-log-title">原生日志 · app.native.log</text>
+                <scroller class="native-debug-log-scroll" scroll-direction="vertical" show-scrollbar="false">
+                    <text class="native-debug-log-line" v-for="(line, index) in nativeLogLines" :key="index">{{line}}</text>
+                </scroller>
+                <text class="native-debug-error" v-if="nativeDebugError">{{nativeDebugError}}</text>
+            </div>
+        </div>
+
+        <div class="settings-mask" v-if="settingsVisible" @click="closeSettings">
+            <div class="settings-panel" @click.stop>
+                <div class="settings-header" :style="{flexDirection: 'row'}">
+                    <text class="settings-title">阅读设置</text>
+                    <div class="settings-close" @click="closeSettings"><image class="material-icon" src="/assets/icons/close.png" /></div>
+                </div>
+                <div class="setting-row" :style="{flexDirection: 'row'}">
+                    <text class="setting-label">字号</text>
+                    <div class="setting-stepper" :style="{flexDirection: 'row'}">
+                        <div class="setting-control" @click="changeFontSize(-1)"><image class="material-icon" src="/assets/icons/remove.png" /></div>
+                        <text class="setting-value">{{settings.fontSize}} px</text>
+                        <div class="setting-control" @click="changeFontSize(1)"><image class="material-icon" src="/assets/icons/add.png" /></div>
+                    </div>
+                </div>
+                <div class="setting-row" :style="{flexDirection: 'row'}">
+                    <text class="setting-label">行距</text>
+                    <div class="setting-stepper" :style="{flexDirection: 'row'}">
+                        <div class="setting-control" @click="changeLineHeight(-0.05)"><image class="material-icon" src="/assets/icons/remove.png" /></div>
+                        <text class="setting-value">{{settings.lineHeight.toFixed(2)}} ×</text>
+                        <div class="setting-control" @click="changeLineHeight(0.05)"><image class="material-icon" src="/assets/icons/add.png" /></div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </template>
 
 <script>
-// 阅读区像素尺寸的来源（PR-4 毛坯约定）：
-//   falcon 目前没有暴露布局测量 API（拿不到节点的实际渲染宽高），这里先用
-//   「屏幕常量 × 布局占比」换算出阅读区 px，传给 Readex.paginate。
-//   **真机尺寸数据（或测量 API）到位后校准** SCREEN_* 常量与 AREA_*_RATIO，
-//   并改为从真实布局测量取值；分页引擎侧无需改动（宽高本来就是显式入参）。
+import { getCurrentBookPath } from '../../utils/BookSession.js'
+import { fs } from '../../utils/FileSystem/FileSystem.js'
+import { logEvent, logError, flushLogs } from '../../utils/Logger.js'
+import BuildInfo from '../../utils/BuildInfo.js'
+import {
+    loadSettings,
+    saveSettings,
+    loadBookCatalog,
+    displayBookTitle,
+    getBookProgress,
+    saveBookProgress
+} from '../../utils/BookLibrary.js'
 
-const SCREEN_W_PX = 400 // TODO 真机校准：横屏分辨率宽（X5 实测后填）
-const SCREEN_H_PX = 240 // TODO 真机校准：横屏分辨率高
-// 与下方 styles 的 .reader-area 布局占比保持一致（宽 100vw、高 85vh）
-const AREA_W_RATIO = 1.0
-const AREA_H_RATIO = 0.85
+const SCREEN_WIDTH = 800
+const SCREEN_HEIGHT = 254
+const LEFT_RAIL_WIDTH = 68
+const RIGHT_RAIL_WIDTH = 76
+const CONTENT_WIDTH = SCREEN_WIDTH - LEFT_RAIL_WIDTH - RIGHT_RAIL_WIDTH
+const PADDING_LEFT = 16
+const PADDING_RIGHT = 16
+const PADDING_TOP = 12
+const PADDING_BOTTOM = 12
 
-// 毛坯示例章文本（一章的已解码文本；真实流程来自 book.getChapter(i).text）
-const SAMPLE_TEXT = '第一章 初见\n' +
-    '这是一个分页引擎的示例段落，用于验证阅读区尺寸显式传入后的排版。' +
-    '中英混排 mixed layout 测试：Hello, world! 42。\n' +
-    '「引号不落行尾，句号不落行首。」标点避头尾的基础验证……\n' +
-    '换页位置与阅读进度的对应关系将在 PR-5 由 ReadingState 持久化。'
-
-// 偏移语义（见 native/include/readex/pagination.hpp 头注释）：
-// PageInfo.startOffset / endOffset 是 content（UTF-8）字节偏移，恒在码点边界。
-// JS 字符串下标 ≠ UTF-8 字节偏移（中文 1 字 = 3 字节），切片前需换算。
-function jsIndexForByte(str, byteOff) {
+function byteOffsetToStringIndex(value, byteOffset) {
+    const target = Math.max(0, Number(byteOffset) || 0)
     let bytes = 0
-    let i = 0
-    while (i < str.length && bytes < byteOff) {
-        const c = str.charCodeAt(i)
-        if (c < 0x80) bytes += 1
-        else if (c < 0x800) bytes += 2
-        else if (c >= 0xD800 && c < 0xDC00 && i + 1 < str.length) { bytes += 4; i++ }
-        else bytes += 3
-        i++
+    let index = 0
+    while (index < value.length && bytes < target) {
+        const cp = value.codePointAt(index)
+        let byteLength = 1
+        if (cp > 0x7F && cp <= 0x7FF) byteLength = 2
+        else if (cp > 0x7FF && cp <= 0xFFFF) byteLength = 3
+        else if (cp > 0xFFFF) byteLength = 4
+        bytes += byteLength
+        index += cp > 0xFFFF ? 2 : 1
     }
-    return i
+    return index
 }
 
-// 原生模块走动态 import（同 src/utils/FileSystem 的模式）：静态 import 在
-// 模块缺失时会让整个模块链求值失败（页面白屏），动态 import 可捕获降级。
 async function loadReadex() {
-    try {
-        const mod = await import('readex')
-        return mod && (mod.default || mod)
-    } catch (e) {
-        return null // PC 构建/未装原生模块：安静降级，页面仍可打开
-    }
+    const mod = await import('readex')
+    return mod && (mod.default || mod)
 }
 
 export default {
     name: 'reader',
-    data: {
-        pageText: '（分页结果将显示在这里）',
-        status: '未分页'
+    data() {
+        return {
+            pageText: '正在打开本地书籍…',
+            pageNumber: '—',
+            pageTexts: [],
+            pageOffsets: [],
+            currentPage: 0,
+            currentChapter: 0,
+            chapters: [],
+            book: null,
+            bookPath: '',
+            bookTitle: '',
+            settings: { fontSize: 17, lineHeight: 1.55 },
+            settingsVisible: false,
+            nativeDebugVisible: false,
+            nativeModuleStatus: '尚未检测',
+            nativeInfo: {},
+            nativeApiSummary: '—',
+            nativeLogLines: ['等待读取原生日志…'],
+            nativeDebugError: '',
+            nativeDebugRefreshing: false,
+            buildInfo: {
+                commitShort: BuildInfo.commit ? BuildInfo.commit.slice(0, 12) : '本地构建',
+                runNumber: BuildInfo.runNumber || 'local',
+                branch: BuildInfo.branch || 'unknown',
+                builtAt: BuildInfo.builtAt || 'unknown',
+                nativeBuiltAt: BuildInfo.nativeBuiltAt || 'unknown',
+                event: BuildInfo.event || 'local',
+                workflow: BuildInfo.workflow || '—'
+            },
+            loading: false
+        }
+    },
+    computed: {
+        readerTextStyle() {
+            return {
+                fontSize: this.settings.fontSize + 'px',
+                lineHeight: (this.settings.fontSize * this.settings.lineHeight) + 'px'
+            }
+        }
     },
     onShow() {
-        this.runPagination()
+        this.loadBook()
+    },
+    onHide() {
+        this.saveProgress()
     },
     methods: {
-        async runPagination() {
-            const Readex = await loadReadex()
-            if (!Readex) {
-                this.status = '原生模块 readex 不可用（PC 构建属正常）'
+        paginationConfig() {
+            return {
+                width: CONTENT_WIDTH,
+                height: SCREEN_HEIGHT,
+                fontSize: this.settings.fontSize,
+                lineHeight: this.settings.lineHeight,
+                paragraphSpacing: this.settings.fontSize * 0.45,
+                paddingTop: PADDING_TOP,
+                paddingBottom: PADDING_BOTTOM,
+                paddingLeft: PADDING_LEFT,
+                paddingRight: PADDING_RIGHT
+            }
+        },
+        async loadBook() {
+            if (this.loading) return
+            this.loading = true
+            let path = getCurrentBookPath()
+            logEvent('reader.loadBook.start', 'sessionPath=' + (path || '<empty>'))
+            if (path) this.bookPath = path
+            this.pageText = '正在读取本地文件…'
+            this.pageTexts = []
+            this.pageOffsets = []
+            this.currentPage = 0
+            let openedBook = null
+            try {
+                logEvent('reader.loadBook.loadSettings.begin')
+                this.settings = await loadSettings()
+                logEvent('reader.loadBook.loadSettings.done', this.settings)
+
+                logEvent('reader.loadBook.loadCatalog.begin')
+                const catalog = await loadBookCatalog()
+                if (!path && catalog.recent.length) {
+                    path = catalog.recent[0]
+                    logEvent('reader.loadBook.pathFallback', 'recent=' + path)
+                }
+                if (!path) throw new Error('没有收到书籍路径，最近阅读记录中也没有可恢复的书籍')
+                this.bookPath = path
+                this.bookTitle = displayBookTitle(catalog, path)
+                logEvent('reader.loadBook.loadCatalog.done', 'path=' + path + ' title=' + this.bookTitle)
+
+                logEvent('reader.loadBook.importReadex.begin')
+                const Readex = await loadReadex()
+                logEvent('reader.loadBook.importReadex.done', 'available=' + !!Readex)
+                if (!Readex || typeof Readex.openBook !== 'function') {
+                    throw new Error('Readex 原生模块未加载，请确认 libjsapi_readex.so 已安装')
+                }
+
+                // openBook is synchronous and may scan the entire file. The
+                // "begin" entry is flushed before entering native code so a
+                // hang can be distinguished from later chapter/pagination work.
+                logEvent('reader.loadBook.openBook.begin', 'path=' + path)
+                // openBook 是同步原生调用，可能长时间占用 JS 线程；必须先把 begin 日志落盘。
+                await flushLogs()
+                openedBook = Readex.openBook(path)
+                logEvent('reader.loadBook.openBook.done')
+
+                logEvent('reader.loadBook.getInfo.begin')
+                const info = openedBook.getInfo()
+                logEvent('reader.loadBook.getInfo.done', info && info.title)
+
+                logEvent('reader.loadBook.getChapters.begin')
+                const chapters = openedBook.getChapters()
+                logEvent('reader.loadBook.getChapters.done', 'count=' + (chapters ? chapters.length : 0))
+                if (!chapters || chapters.length === 0) {
+                    throw new Error('文件中没有可读取的章节')
+                }
+                if (this.book && typeof this.book.close === 'function') {
+                    try { this.book.close() } catch (e) {}
+                }
+                this.book = openedBook
+                openedBook = null
+                this.bookTitle = this.bookTitle || (info && info.title) || path
+                this.chapters = chapters
+                const savedProgress = await getBookProgress(path)
+                const chapterIndex = savedProgress
+                    ? Math.min(savedProgress.chapterIndex, chapters.length - 1)
+                    : 0
+                const pageIndex = savedProgress ? savedProgress.pageIndex : 0
+                logEvent('reader.loadBook.restoreProgress', {
+                    chapterIndex,
+                    pageIndex,
+                    found: !!savedProgress
+                })
+                logEvent('reader.loadBook.loadChapter.begin', 'index=' + chapterIndex)
+                await this.loadChapter(chapterIndex, 0)
+                if (savedProgress && this.pageOffsets.length &&
+                    typeof this.book.setProgress === 'function' &&
+                    typeof this.book.locatePage === 'function') {
+                    try {
+                        this.book.setProgress({
+                            chapterIndex,
+                            textOffset: savedProgress.textOffset || 0,
+                            pageIndex
+                        })
+                        this.currentPage = this.book.locatePage(this.pageOffsets)
+                        this.updatePage()
+                    } catch (restoreError) {
+                        logError('reader.loadBook.restoreNativeProgress', restoreError)
+                        this.currentPage = Math.max(0, Math.min(pageIndex, this.pageTexts.length - 1))
+                        this.updatePage()
+                    }
+                } else if (savedProgress) {
+                    this.currentPage = Math.max(0, Math.min(pageIndex, this.pageTexts.length - 1))
+                    this.updatePage()
+                }
+                await this.saveProgress()
+                logEvent('reader.loadBook.done', 'chapters=' + chapters.length)
+            } catch (e) {
+                logError('reader.loadBook', e)
+                if (openedBook && typeof openedBook.close === 'function') {
+                    try { openedBook.close() } catch (closeError) {
+                        logError('reader.loadBook.close', closeError)
+                    }
+                }
+                this.pageText = '打开失败：' + (e && e.message ? e.message : String(e))
+                this.pageNumber = '—'
+            } finally {
+                this.loading = false
+                logEvent('reader.loadBook.finally', 'loading=false')
+            }
+        },
+        async loadChapter(chapterIndex, pageIndex) {
+            if (!this.book || chapterIndex < 0 || chapterIndex >= this.chapters.length) return
+            logEvent('reader.loadChapter.getChapter.begin', 'index=' + chapterIndex)
+            const chapter = this.book.getChapter(chapterIndex)
+            const text = chapter && chapter.text ? chapter.text : ''
+            logEvent('reader.loadChapter.getChapter.done', 'textLength=' + text.length)
+            if (!text) throw new Error('章节内容为空')
+            logEvent('reader.loadChapter.paginate.begin', 'index=' + chapterIndex)
+            const pages = this.book.paginateChapter(chapterIndex, this.paginationConfig())
+            logEvent('reader.loadChapter.paginate.done', 'pageCount=' + (pages ? pages.length : 0))
+            const pageTexts = []
+            if (pages && pages.length) {
+                // 页偏移按文本顺序递增；维护一个 UTF-8 字节游标和字符串游标，
+                // 整章最多扫描一次，避免每页从字符串开头重复计算。
+                let stringIndex = 0
+                let byteIndex = 0
+                const advanceTo = targetOffset => {
+                    const target = Math.max(0, Number(targetOffset) || 0)
+                    while (stringIndex < text.length && byteIndex < target) {
+                        const cp = text.codePointAt(stringIndex)
+                        let byteLength = 1
+                        if (cp > 0x7F && cp <= 0x7FF) byteLength = 2
+                        else if (cp > 0x7FF && cp <= 0xFFFF) byteLength = 3
+                        else if (cp > 0xFFFF) byteLength = 4
+                        byteIndex += byteLength
+                        stringIndex += cp > 0xFFFF ? 2 : 1
+                    }
+                    return stringIndex
+                }
+                for (let i = 0; i < pages.length; i++) {
+                    const start = advanceTo(pages[i].startOffset)
+                    const end = advanceTo(pages[i].endOffset)
+                    pageTexts.push(text.substring(start, end))
+                }
+            }
+            if (pageTexts.length === 0) pageTexts.push(text)
+            this.currentChapter = chapterIndex
+            this.pageOffsets = pages || []
+            this.pageTexts = pageTexts
+            this.currentPage = Math.max(0, Math.min(Number(pageIndex) || 0, pageTexts.length - 1))
+            this.updatePage()
+        },
+        updatePage() {
+            if (!this.pageTexts.length) return
+            this.pageText = this.pageTexts[this.currentPage] || ''
+            this.pageNumber = (this.currentPage + 1) + '/' + this.pageTexts.length
+        },
+        async previousPage() {
+            if (this.currentPage > 0) {
+                this.currentPage--
+                this.updatePage()
+                await this.saveProgress()
                 return
             }
-            // 可用阅读区域宽高 = 真实布局占比 × 屏幕尺寸（显式传入，见文件头）
-            const config = {
-                width: SCREEN_W_PX * AREA_W_RATIO,
-                height: SCREEN_H_PX * AREA_H_RATIO,
-                fontSize: 20,
-                lineHeight: 1.5
-                // 其余字段（字距/段距/边距/估算系数）走默认值
+            if (this.currentChapter > 0) {
+                try {
+                    await this.loadChapter(this.currentChapter - 1, 0)
+                    this.currentPage = this.pageTexts.length - 1
+                    this.updatePage()
+                    await this.saveProgress()
+                } catch (e) {
+                    this.pageText = '上一章加载失败：' + (e && e.message ? e.message : String(e))
+                }
+            }
+        },
+        async nextPage() {
+            if (this.currentPage < this.pageTexts.length - 1) {
+                this.currentPage++
+                this.updatePage()
+                await this.saveProgress()
+                return
+            }
+            if (this.currentChapter < this.chapters.length - 1) {
+                try {
+                    await this.loadChapter(this.currentChapter + 1, 0)
+                    await this.saveProgress()
+                } catch (e) {
+                    this.pageText = '下一章加载失败：' + (e && e.message ? e.message : String(e))
+                }
+            }
+        },
+        async saveProgress() {
+            if (!this.bookPath || !this.book) return
+            const page = this.pageOffsets[this.currentPage]
+            const textOffset = page ? Math.max(0, Number(page.startOffset) || 0) : 0
+            const progress = {
+                chapterIndex: this.currentChapter,
+                pageIndex: this.currentPage,
+                textOffset
             }
             try {
-                const pages = Readex.paginate(SAMPLE_TEXT, config)
-                const first = pages[0]
-                this.pageText = SAMPLE_TEXT.substring(
-                    jsIndexForByte(SAMPLE_TEXT, first.startOffset),
-                    jsIndexForByte(SAMPLE_TEXT, first.endOffset))
-                this.status = '共 ' + pages.length + ' 页（第 1 页预览）'
-            } catch (e) {
-                this.status = '分页失败: ' + (e && e.message ? e.message : e)
+                await saveBookProgress(this.bookPath, progress)
+                if (typeof this.book.setProgress === 'function') {
+                    this.book.setProgress({
+                        chapterIndex: this.currentChapter,
+                        textOffset,
+                        pageIndex: this.currentPage
+                    })
+                }
+            } catch (error) {
+                logError('reader.saveProgress', error)
             }
+        },
+        toggleSettings() {
+            this.settingsVisible = !this.settingsVisible
+        },
+        async toggleNativeDebug() {
+            this.nativeDebugVisible = !this.nativeDebugVisible
+            if (this.nativeDebugVisible) await this.refreshNativeDebug()
+        },
+        async refreshNativeDebug() {
+            if (this.nativeDebugRefreshing) return
+            this.nativeDebugRefreshing = true
+            this.nativeDebugError = ''
+            this.nativeModuleStatus = '正在检测…'
+            try {
+                const Readex = await loadReadex()
+                if (!Readex) throw new Error('readex 模块导入结果为空')
+                this.nativeModuleStatus = '模块已加载'
+                this.nativeInfo = typeof Readex.info === 'function' ? (Readex.info() || {}) : {}
+                this.nativeApiSummary = [
+                    'openBook:' + (typeof Readex.openBook === 'function' ? 'OK' : '缺失'),
+                    'paginate:' + (typeof Readex.paginate === 'function' ? 'OK' : '缺失'),
+                    'closeAllBooks:' + (typeof Readex.closeAllBooks === 'function' ? 'OK' : '缺失')
+                ].join('  ')
+            } catch (error) {
+                this.nativeModuleStatus = '模块不可用'
+                this.nativeInfo = {}
+                this.nativeApiSummary = '不可读取'
+                this.nativeDebugError = '模块检测失败：' + (error && error.message ? error.message : String(error))
+                logError('reader.nativeDebug.module', error)
+            }
+            try {
+                const path = '/userdisk/readex/app.native.log'
+                if (await fs.exists(path)) {
+                    const content = String(await fs.readFile(path) || '')
+                    const lines = content.split(/\r?\n/).filter(Boolean)
+                    this.nativeLogLines = lines.slice(-24)
+                    if (!this.nativeLogLines.length) this.nativeLogLines = ['原生日志文件为空']
+                } else {
+                    this.nativeLogLines = ['尚未生成 app.native.log', '日志路径：' + path]
+                }
+            } catch (error) {
+                this.nativeLogLines = ['读取原生日志失败']
+                this.nativeDebugError = (this.nativeDebugError ? this.nativeDebugError + '；' : '') +
+                    (error && error.message ? error.message : String(error))
+                logError('reader.nativeDebug.log', error)
+            } finally {
+                this.nativeDebugRefreshing = false
+            }
+        },
+        closeSettings() {
+            this.settingsVisible = false
+        },
+        async changeFontSize(delta) {
+            const value = Math.max(12, Math.min(30, this.settings.fontSize + delta))
+            if (value === this.settings.fontSize) return
+            this.settings.fontSize = value
+            await this.applySettings()
+        },
+        async changeLineHeight(delta) {
+            const value = Math.max(1.1, Math.min(2.2, Math.round((this.settings.lineHeight + delta) * 100) / 100))
+            if (value === this.settings.lineHeight) return
+            this.settings.lineHeight = value
+            await this.applySettings()
+        },
+        async applySettings() {
+            try {
+                this.settings = await saveSettings(this.settings)
+                if (this.book) await this.loadChapter(this.currentChapter, this.currentPage)
+            } catch (e) {
+                this.pageText = '保存设置失败：' + (e && e.message ? e.message : String(e))
+            }
+        },
+        async goBack() {
+            await this.saveProgress()
+            if (this.book && typeof this.book.close === 'function') {
+                try { this.book.close() } catch (e) {}
+                this.book = null
+            }
+            this.$page.finish()
         }
     }
 }
@@ -106,36 +531,115 @@ export default {
 <style lang="less">
 @import '../../styles/common.less';
 
-// 阅读区：占比与脚本里 AREA_*_RATIO 一致（真机校准两处一起改）
-.reader-page {
-    width: 100vw;
-    height: 100vh;
+.native-debug-mask {
+    position: absolute;
+    left: 76px;
+    right: 84px;
+    top: 8px;
+    bottom: 8px;
+    z-index: 30;
+}
+
+.native-debug-panel {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    padding: 10px 14px;
+    background-color: #17191d;
+    border: 1px solid #41454d;
+    display: flex;
     flex-direction: column;
-    background-color: @surface;
 }
 
-.reader-area {
-    width: 100vw;
-    height: 85vh;
-    padding: 2vh 2vw;
-    background-color: @surface;
-}
-
-.reader-text {
-    color: @on-surface;
-    font-size: 4vh;
-}
-
-.reader-status {
-    width: 100vw;
-    height: 15vh;
-    justify-content: center;
+.native-debug-header,
+.native-debug-actions,
+.native-debug-info,
+.native-debug-item {
+    display: flex;
+    flex-direction: row;
     align-items: center;
-    background-color: @surface-variant;
 }
 
-.status-text {
-    color: @on-surface-variant;
-    font-size: 3vh;
+.native-debug-header {
+    justify-content: space-between;
+    min-height: 28px;
+}
+
+.native-debug-heading {
+    display: flex;
+    flex-direction: row;
+    align-items: baseline;
+}
+
+.native-debug-title {
+    color: #f2f3f5;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.native-debug-status {
+    color: #a9c7ff;
+    font-size: 11px;
+    margin-left: 12px;
+}
+
+.native-debug-actions {
+    gap: 12px;
+}
+
+.debug-action {
+    width: 30px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.native-debug-info {
+    flex-wrap: wrap;
+    margin-top: 6px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #383c43;
+}
+
+.native-debug-item {
+    width: 50%;
+    min-height: 22px;
+}
+
+.native-debug-label {
+    color: #9299a5;
+    font-size: 11px;
+    width: 76px;
+}
+
+.native-debug-value {
+    color: #e0e3e8;
+    font-size: 11px;
+    flex: 1;
+}
+
+.native-debug-log-title {
+    color: #c4cad4;
+    font-size: 11px;
+    margin-top: 5px;
+    margin-bottom: 3px;
+}
+
+.native-debug-log-scroll {
+    flex: 1;
+    min-height: 0;
+}
+
+.native-debug-log-line {
+    color: #c4cbd5;
+    font-size: 10px;
+    line-height: 13px;
+}
+
+.native-debug-error {
+    color: #ffb4ab;
+    font-size: 10px;
+    margin-top: 3px;
 }
 </style>

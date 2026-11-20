@@ -13,6 +13,7 @@
 #define READEX_BINDING_UTIL_HPP
 
 #include "quickjs.h"
+#include "native_logger.hpp"
 
 #include "readex/error.hpp"
 #include "readex/pagination.hpp"
@@ -195,11 +196,13 @@ JSValue js_book_deserialize_state(JSContext* ctx, JSValueConst this_val,
 // —— ABI 边界护栏：异常一律转 JS Error，绝不越过 C ABI ——
 #define READEX_GUARD_BEGIN(ctx) \
     try {
-#define READEX_GUARD_END(ctx)                                      \
-    } catch (...) {                                                \
-        return JS_Throw((ctx),                                     \
-                        ::readex_bind::make_js_error(              \
-                            (ctx), ::readex::currentExceptionToError())); \
+#define READEX_GUARD_END(ctx)                                                   \
+    } catch (...) {                                                             \
+        const ::readex::Error readex_error = ::readex::currentExceptionToError(); \
+        ::readex_native_log::write("ERROR", "binding.exception",                \
+                                   readex_error.toString().c_str());             \
+        return JS_Throw((ctx),                                                   \
+                        ::readex_bind::make_js_error((ctx), readex_error));       \
     }
 
 #endif // READEX_BINDING_UTIL_HPP

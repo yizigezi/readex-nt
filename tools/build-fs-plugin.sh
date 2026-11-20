@@ -17,8 +17,16 @@ OUT="$OUT_DIR/libjsapi_fs.so"
 TARGET_LIBS="$ROOT/libs/libjsapi_fs.so"
 EXPECT_GLIBC="2.23"
 
-# ZIG 环境变量可指定 zig 路径，默认从 PATH 找
-ZIG="$(command -v "${ZIG:-zig}" 2>/dev/null || true)"
+# 工具链解析：ZIG 环境变量 > PATH 里的 zig > pip 包 ziglang（python3 -m ziglang）
+if [ -n "${ZIG:-}" ] && command -v "$ZIG" >/dev/null 2>&1; then
+  ZIG_CMD=("$ZIG")
+elif command -v zig >/dev/null 2>&1; then
+  ZIG_CMD=(zig)
+elif python3 -c "import ziglang" >/dev/null 2>&1; then
+  ZIG_CMD=(python3 -m ziglang)
+else
+  ZIG_CMD=()
+fi
 
 check_elf() {
   local so="$1"
@@ -75,14 +83,14 @@ fi
 mkdir -p "$OUT_DIR"
 
 echo "== 编译 $OUT （目标 armv7 hard-float, glibc $EXPECT_GLIBC） =="
-if [ -n "$ZIG" ]; then
-  echo "== 工具链: $ZIG =="
-  "$ZIG" cc -target arm-linux-gnueabihf.${EXPECT_GLIBC} \
-    -shared -fPIC -O2 -fvisibility=hidden \
+if [ "${#ZIG_CMD[@]}" -gt 0 ]; then
+  echo "== 工具链: ${ZIG_CMD[*]} =="
+  "${ZIG_CMD[@]}" cc -target arm-linux-gnueabihf.${EXPECT_GLIBC} \
+    -shared -fPIC -O2 -g0 -fvisibility=hidden -ffile-prefix-map="$ROOT"=. -Wl,--strip-all \
     -I "$INC" "$SRC" -o "$OUT"
 elif command -v arm-linux-gnueabihf-gcc >/dev/null 2>&1; then
   echo "== 工具链: arm-linux-gnueabihf-gcc（注意: 链接宿主交叉 glibc，需自检符号版本） =="
-  arm-linux-gnueabihf-gcc -shared -fPIC -O2 -fvisibility=hidden -static-libgcc \
+  arm-linux-gnueabihf-gcc -shared -fPIC -O2 -g0 -fvisibility=hidden -ffile-prefix-map="$ROOT"=. -Wl,--strip-all -static-libgcc \
     -I "$INC" "$SRC" -o "$OUT"
 else
   echo "错误: 未找到 zig 或 arm-linux-gnueabihf-gcc" >&2

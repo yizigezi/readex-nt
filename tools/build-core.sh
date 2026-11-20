@@ -138,12 +138,12 @@ if [ "${#ZIG_CMD[@]}" -gt 0 ]; then
   echo "== 工具链: ${ZIG_CMD[*]} =="
   # zig c++ 默认静态链 C++ 运行时（libc++/compiler-rt），glibc 符号钉 $EXPECT_GLIBC
   "${ZIG_CMD[@]}" c++ -target arm-linux-gnueabihf.${EXPECT_GLIBC} \
-    -std=c++14 -shared -fPIC -O2 -fvisibility=hidden \
+    -std=c++14 -shared -fPIC -O2 -g0 -fvisibility=hidden -ffile-prefix-map="$ROOT"=. -Wl,--strip-all \
     "${INC[@]}" "${SRC[@]}" -o "$OUT"
 elif command -v arm-linux-gnueabihf-g++ >/dev/null 2>&1; then
   echo "== 工具链: arm-linux-gnueabihf-g++（注意: 链接宿主交叉 glibc，需自检符号版本） =="
   arm-linux-gnueabihf-g++ \
-    -std=c++14 -shared -fPIC -O2 -fvisibility=hidden \
+    -std=c++14 -shared -fPIC -O2 -g0 -fvisibility=hidden -ffile-prefix-map="$ROOT"=. -Wl,--strip-all \
     -static-libstdc++ -static-libgcc \
     "${INC[@]}" "${SRC[@]}" -o "$OUT"
 else

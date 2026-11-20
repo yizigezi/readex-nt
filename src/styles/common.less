@@ -1,27 +1,569 @@
 @import 'md-color.less';
 
-// 横屏条形屏毛坯布局（词典笔屏幕为横向长条形）
-// 全部用 vw/vh 相对单位，适配任意条形屏比例，分辨率真机确认后再补精调。
+/* MiSans（小米字体，免费商用）；打包器会把根目录 assets/ 原样打进 AMR。
+   绝对路径便于构建期校验与运行时解析；取不到时回退系统默认字体 */
+@font-face {
+    font-family: 'MiSans';
+    src: url('/assets/MiSans-Regular.ttf');
+}
 
-.bar-screen {
+/* ============================================================
+   Material 3 Expressive · 横向布局（800 × 254 px）
+   形状语言：大圆角卡片（24px）/ 圆形图标钮（全圆）/ 胶囊按钮（999px）
+   色彩语言：tonal 分层 + primary-container 做选中与强调
+   ============================================================ */
+
+.home-page,
+.reader-page {
     width: 100vw;
     height: 100vh;
     flex-direction: row;
-    align-items: stretch;
     background-color: @surface;
+    font-family: 'MiSans', sans-serif;
+    position: relative;
 }
 
-.entry {
-    flex: 1;
-    flex-direction: column;
+/* ---------- 通用：形状化控件 ---------- */
+
+.icon-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 22px;
     align-items: center;
     justify-content: center;
-    margin: 2vh 1vw;
-    border-radius: 2vh;
+    background-color: @surface-container-high;
+}
+
+.icon-btn-accent {
+    width: 44px;
+    height: 44px;
+    border-radius: 22px;
+    align-items: center;
+    justify-content: center;
     background-color: @primary-container;
 }
 
-.entry-name {
+.pill-btn {
+    height: 40px;
+    padding: 0 18px;
+    border-radius: 20px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    background-color: @primary;
+}
+
+.pill-btn-ghost {
+    height: 40px;
+    padding: 0 18px;
+    border-radius: 20px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    background-color: @surface-container-high;
+}
+
+.pill-text {
+    color: @on-primary;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.pill-text-ghost {
+    color: @on-surface;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.material-icon {
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+}
+
+/* 分段按钮（M3 segmented buttons：相邻胶囊，选中态 primary-container） */
+.segment {
+    height: 38px;
+    border-radius: 19px;
+    flex-direction: row;
+    align-items: center;
+    background-color: @surface-container;
+    padding: 3px;
+}
+
+.segment-item {
+    height: 32px;
+    padding: 0 16px;
+    border-radius: 16px;
+    align-items: center;
+    justify-content: center;
+    margin-right: 4px;
+}
+
+.segment-item-active {
+    height: 32px;
+    padding: 0 16px;
+    border-radius: 16px;
+    align-items: center;
+    justify-content: center;
+    background-color: @primary-container;
+    margin-right: 4px;
+}
+
+.segment-text {
+    color: @on-surface-variant;
+    font-size: 13px;
+}
+
+.segment-text-active {
     color: @on-primary-container;
-    font-size: 8vh;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+/* ============================================================
+   首页（书架）：顶栏一行 + 横向卡片流
+   ============================================================ */
+
+.home-shell {
+    width: 100vw;
+    height: 100vh;
+    flex-direction: column;
+    padding: 12px 16px;
+}
+
+.home-topbar {
+    width: 100%;
+    height: 46px;
+    flex-direction: row;
+    align-items: center;
+}
+
+.home-title {
+    color: @on-surface;
+    font-size: 19px;
+    font-weight: bold;
+    margin-left: 12px;
+}
+
+.home-path {
+    color: @on-surface-variant;
+    font-size: 12px;
+    margin-left: 12px;
+    flex: 1;
+    max-width: 330px;
+    text-overflow: ellipsis;
+    max-height: 16px;
+}
+
+.home-top-spacer {
+    flex: 1;
+}
+
+.home-top-actions {
+    flex-direction: row;
+    align-items: center;
+    margin-left: 8px;
+}
+
+.gap-left {
+    margin-left: 8px;
+}
+
+/* 横向卡片流 */
+.shelf-row {
+    width: 100%;
+    flex: 1;
+    margin-top: 12px;
+    flex-direction: row;
+}
+
+.file-card {
+    width: 156px;
+    height: 152px;
+    flex-direction: column;
+    margin-right: 10px;
+    border-radius: 20px;
+    background-color: @surface-container;
+    padding: 10px;
+    justify-content: flex-start;
+}
+
+.card-cover {
+    width: 100%;
+    height: 54px;
+    border-radius: 14px;
+    background-color: @primary-container;
+    align-items: center;
+    justify-content: center;
+}
+
+.card-cover-folder {
+    width: 100%;
+    height: 54px;
+    border-radius: 14px;
+    background-color: @secondary-container;
+    align-items: center;
+    justify-content: center;
+}
+
+.card-cover-icon {
+    width: 26px;
+    height: 26px;
+    object-fit: contain;
+}
+
+.card-edit {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 32px;
+    height: 32px;
+    border-radius: 16px;
+    background-color: @surface-container-highest;
+    align-items: center;
+    justify-content: center;
+}
+
+.card-edit-icon {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+}
+
+.file-title {
+    color: @on-surface;
+    font-size: 13px;
+    font-weight: bold;
+    max-lines: 1;
+    margin-top: 8px;
+    text-overflow: ellipsis;
+    max-height: 18px;
+}
+
+.file-meta {
+    color: @on-surface-variant;
+    font-size: 10px;
+    margin-top: 2px;
+}
+
+.library-status {
+    width: 100%;
+    flex: 1;
+    justify-content: center;
+    align-items: center;
+}
+
+.status-text {
+    color: @on-surface-variant;
+    font-size: 15px;
+    text-align: center;
+}
+
+/* ============================================================
+   阅读页：几何为分页算法镜像（PaginationConfig），勿动
+   rails = 68 / 76，center 656×254，padding 16 / 12，text 624×230
+   ============================================================ */
+
+.left-rail {
+    width: 68px;
+    height: 100vh;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 8px 0;
+    background-color: transparent;
+}
+
+.right-rail {
+    width: 76px;
+    height: 100vh;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 5px 0;
+    background-color: transparent;
+}
+
+.rail-button {
+    width: 52px;
+    height: 52px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin-top: 5px;
+    margin-bottom: 5px;
+    border-radius: 18px;
+    background-color: @surface-container;
+}
+
+.rail-button-accent {
+    width: 52px;
+    height: 52px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin-top: 5px;
+    margin-bottom: 5px;
+    border-radius: 18px;
+    background-color: @primary-container;
+}
+
+.back-button {
+    margin-top: 0;
+}
+
+.center-content {
+    flex: 1;
+    width: 0;
+    min-width: 0;
+    height: 100vh;
+    flex-direction: column;
+    justify-content: center;
+    padding: 10px 8px;
+    background-color: @surface;
+}
+
+/* The reading area geometry is mirrored by PaginationConfig:
+   center 656×254, horizontal padding 16, vertical padding 12. */
+.reader-center {
+    flex: 1;
+    width: 0;
+    min-width: 0;
+    height: 100vh;
+    justify-content: flex-start;
+    padding: 12px 16px;
+    overflow: hidden;
+}
+
+.reader-text {
+    width: 624px;
+    height: 230px;
+    color: @on-surface;
+    font-family: 'MiSans', sans-serif;
+    font-size: 17px;
+    line-height: 26px;
+    text-align: left;
+    white-space: pre-wrap;
+    word-break: break-all;
+    overflow: hidden;
+}
+
+/* 阅读页设置浮层 */
+.settings-mask {
+    position: absolute;
+    left: 68px;
+    right: 76px;
+    top: 0;
+    bottom: 0;
+    justify-content: flex-end;
+    align-items: center;
+    background-color: rgba(0, 0, 0, 0.3);
+}
+
+.settings-panel {
+    width: 320px;
+    padding: 18px;
+    margin-right: 12px;
+    border-radius: 28px;
+    background-color: @surface-container-high;
+    flex-direction: column;
+}
+
+.settings-header {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+}
+
+.settings-title {
+    color: @on-surface;
+    font-size: 17px;
+    font-weight: bold;
+}
+
+.settings-close {
+    width: 38px;
+    height: 38px;
+    border-radius: 19px;
+    align-items: center;
+    justify-content: center;
+    background-color: @surface-container-highest;
+}
+
+.setting-row {
+    width: 100%;
+    height: 58px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.setting-label {
+    color: @on-surface;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.setting-stepper {
+    flex-direction: row;
+    align-items: center;
+}
+
+.setting-control {
+    width: 42px;
+    height: 42px;
+    border-radius: 21px;
+    align-items: center;
+    justify-content: center;
+    background-color: @primary-container;
+}
+
+.setting-value {
+    width: 72px;
+    color: @on-surface;
+    font-size: 14px;
+    font-weight: bold;
+    text-align: center;
+}
+
+/* 重命名对话框 */
+.dialog-mask {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    justify-content: center;
+    align-items: center;
+    background-color: rgba(0, 0, 0, 0.45);
+}
+
+.rename-dialog {
+    width: 340px;
+    padding: 20px;
+    border-radius: 28px;
+    background-color: @surface-container-high;
+    flex-direction: column;
+}
+
+.dialog-title {
+    color: @on-surface;
+    font-size: 17px;
+    font-weight: bold;
+    margin-bottom: 12px;
+}
+
+.rename-input {
+    width: 100%;
+    height: 46px;
+    padding: 6px 14px;
+    color: @on-surface;
+    font-size: 14px;
+    border-radius: 16px;
+    background-color: @surface-container;
+}
+
+.dialog-actions {
+    flex-direction: row;
+    justify-content: flex-end;
+    margin-top: 14px;
+}
+
+.dialog-button {
+    height: 40px;
+    padding: 0 18px;
+    border-radius: 20px;
+    margin-left: 10px;
+    align-items: center;
+    justify-content: center;
+    background-color: @surface-container-highest;
+}
+
+.dialog-button-primary {
+    height: 40px;
+    padding: 0 18px;
+    border-radius: 20px;
+    margin-left: 10px;
+    align-items: center;
+    justify-content: center;
+    background-color: @primary;
+}
+
+.dialog-button-text {
+    color: @on-surface;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.dialog-button-text-primary {
+    color: @on-primary;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+/* ============================================================
+   web 预览安全网（预期真机被丢弃）
+   weex-vue-render 在 web 上给所有 div 挂 .weex-ct 基础样式
+   （flex-direction:column / 黑字），按源序覆盖同特异性的单类规则；
+   真机 Weex 引擎只认单类选择器，本段复合选择器会被丢弃——
+   即真机不受影响，构建日志出现 selector 提示属预期。
+   ============================================================ */
+
+.weex-ct .home-title,
+.weex-ct .home-path,
+.weex-ct .segment-text,
+.weex-ct .segment-text-active,
+.weex-ct .file-title,
+.weex-ct .file-meta,
+.weex-ct .status-text,
+.weex-ct .pill-text,
+.weex-ct .pill-text-ghost,
+.weex-ct .reader-text,
+.weex-ct .settings-title,
+.weex-ct .setting-label,
+.weex-ct .setting-value,
+.weex-ct .dialog-title,
+.weex-ct .dialog-button-text,
+.weex-ct .dialog-button-text-primary {
+    color: inherit;
+}
+
+.weex-ct .home-title,
+.weex-ct .reader-text,
+.weex-ct .settings-title,
+.weex-ct .dialog-title {
+    color: @on-surface;
+}
+
+.weex-ct .home-path,
+.weex-ct .file-meta,
+.weex-ct .status-text,
+.weex-ct .setting-label {
+    color: @on-surface-variant;
+}
+
+.weex-ct .segment-text {
+    color: @on-surface-variant;
+}
+
+.weex-ct .segment-text-active {
+    color: @on-primary-container;
+}
+
+.weex-ct .file-title,
+.weex-ct .setting-value,
+.weex-ct .dialog-button-text {
+    color: @on-surface;
+}
+
+.weex-ct .pill-text,
+.weex-ct .dialog-button-text-primary {
+    color: @on-primary;
+}
+
+.weex-ct .pill-text-ghost {
+    color: @on-surface;
 }

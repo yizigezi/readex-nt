@@ -1,5 +1,5 @@
 <template>
-    <div class="reader-page">
+    <div class="reader-page" :style="{flexDirection: 'row'}">
         <div class="left-rail">
             <div class="rail-button back-button" @click="goBack">
                 <image class="material-icon" src="/assets/icons/arrow_back.png" />
@@ -10,7 +10,7 @@
             <text class="reader-text" :style="readerTextStyle">{{pageText}}</text>
         </div>
 
-        <div class="right-rail reader-rail">
+        <div class="right-rail">
             <div class="rail-button" @click="previousPage">
                 <image class="material-icon" src="/assets/icons/chevron_left.png" />
             </div>
@@ -101,21 +101,21 @@
 
         <div class="settings-mask" v-if="settingsVisible" @click="closeSettings">
             <div class="settings-panel" @click.stop>
-                <div class="settings-header">
+                <div class="settings-header" :style="{flexDirection: 'row'}">
                     <text class="settings-title">阅读设置</text>
                     <div class="settings-close" @click="closeSettings"><image class="material-icon" src="/assets/icons/close.png" /></div>
                 </div>
-                <div class="setting-row">
+                <div class="setting-row" :style="{flexDirection: 'row'}">
                     <text class="setting-label">字号</text>
-                    <div class="setting-stepper">
+                    <div class="setting-stepper" :style="{flexDirection: 'row'}">
                         <div class="setting-control" @click="changeFontSize(-1)"><image class="material-icon" src="/assets/icons/remove.png" /></div>
                         <text class="setting-value">{{settings.fontSize}} px</text>
                         <div class="setting-control" @click="changeFontSize(1)"><image class="material-icon" src="/assets/icons/add.png" /></div>
                     </div>
                 </div>
-                <div class="setting-row">
+                <div class="setting-row" :style="{flexDirection: 'row'}">
                     <text class="setting-label">行距</text>
-                    <div class="setting-stepper">
+                    <div class="setting-stepper" :style="{flexDirection: 'row'}">
                         <div class="setting-control" @click="changeLineHeight(-0.05)"><image class="material-icon" src="/assets/icons/remove.png" /></div>
                         <text class="setting-value">{{settings.lineHeight.toFixed(2)}} ×</text>
                         <div class="setting-control" @click="changeLineHeight(0.05)"><image class="material-icon" src="/assets/icons/add.png" /></div>

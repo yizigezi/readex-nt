@@ -1,13 +1,18 @@
 @import 'md-color.less';
 
-/* MiSans（小米字体，免费商用）；打包器会把根目录 assets/ 原样打进 AMR，
-   url 多写几种路径形式由运行时自行解析；均失败时回退系统默认字体 */
+/* MiSans（小米字体，免费商用）；打包器会把根目录 assets/ 原样打进 AMR。
+   绝对路径便于构建期校验与运行时解析；取不到时回退系统默认字体 */
 @font-face {
     font-family: 'MiSans';
-    src: url('/assets/MiSans-Regular.ttf'), url('assets/MiSans-Regular.ttf'), url('../assets/MiSans-Regular.ttf');
+    src: url('/assets/MiSans-Regular.ttf');
 }
 
-/* Landscape 800 × 254 px. Side rails remain transparent. */
+/* ============================================================
+   Material 3 Expressive · 横向布局（800 × 254 px）
+   形状语言：大圆角卡片（24px）/ 圆形图标钮（全圆）/ 胶囊按钮（999px）
+   色彩语言：tonal 分层 + primary-container 做选中与强调
+   ============================================================ */
+
 .home-page,
 .reader-page {
     width: 100vw;
@@ -18,46 +23,291 @@
     position: relative;
 }
 
+/* ---------- 通用：形状化控件 ---------- */
+
+.icon-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 22px;
+    align-items: center;
+    justify-content: center;
+    background-color: @surface-container-high;
+}
+
+.icon-btn-accent {
+    width: 44px;
+    height: 44px;
+    border-radius: 22px;
+    align-items: center;
+    justify-content: center;
+    background-color: @primary-container;
+}
+
+.pill-btn {
+    height: 40px;
+    padding: 0 18px;
+    border-radius: 20px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    background-color: @primary;
+}
+
+.pill-btn-ghost {
+    height: 40px;
+    padding: 0 18px;
+    border-radius: 20px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    background-color: @surface-container-high;
+}
+
+.pill-text {
+    color: @on-primary;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.pill-text-ghost {
+    color: @on-surface;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.material-icon {
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+}
+
+/* 分段按钮（M3 segmented buttons：相邻胶囊，选中态 primary-container） */
+.segment {
+    height: 38px;
+    border-radius: 19px;
+    flex-direction: row;
+    align-items: center;
+    background-color: @surface-container;
+    padding: 3px;
+}
+
+.segment-item {
+    height: 32px;
+    padding: 0 16px;
+    border-radius: 16px;
+    align-items: center;
+    justify-content: center;
+}
+
+.segment-item-active {
+    height: 32px;
+    padding: 0 16px;
+    border-radius: 16px;
+    align-items: center;
+    justify-content: center;
+    background-color: @primary-container;
+}
+
+.segment-text {
+    color: @on-surface-variant;
+    font-size: 13px;
+}
+
+.segment-text-active {
+    color: @on-primary-container;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+/* ============================================================
+   首页（书架）：顶栏一行 + 横向卡片流
+   ============================================================ */
+
+.home-shell {
+    width: 100vw;
+    height: 100vh;
+    flex-direction: column;
+    padding: 12px 16px;
+}
+
+.home-topbar {
+    width: 100%;
+    height: 46px;
+    flex-direction: row;
+    align-items: center;
+}
+
+.home-title {
+    color: @on-surface;
+    font-size: 19px;
+    font-weight: bold;
+    margin-left: 12px;
+}
+
+.home-path {
+    color: @on-surface-variant;
+    font-size: 11px;
+    margin-left: 12px;
+    flex: 1;
+    max-width: 330px;
+    text-overflow: ellipsis;
+    max-height: 16px;
+}
+
+.home-top-spacer {
+    flex: 1;
+}
+
+.home-top-actions {
+    flex-direction: row;
+    align-items: center;
+    margin-left: 8px;
+}
+
+.gap-left {
+    margin-left: 8px;
+}
+
+/* 横向卡片流 */
+.shelf-row {
+    width: 100%;
+    flex: 1;
+    margin-top: 12px;
+    flex-direction: row;
+}
+
+.file-card {
+    width: 168px;
+    height: 100%;
+    max-height: 168px;
+    flex-direction: column;
+    margin-right: 12px;
+    border-radius: 24px;
+    background-color: @surface-container;
+    padding: 12px;
+    justify-content: space-between;
+}
+
+.card-cover {
+    width: 100%;
+    height: 62px;
+    border-radius: 16px;
+    background-color: @primary-container;
+    align-items: center;
+    justify-content: center;
+}
+
+.card-cover-folder {
+    width: 100%;
+    height: 62px;
+    border-radius: 16px;
+    background-color: @secondary-container;
+    align-items: center;
+    justify-content: center;
+}
+
+.card-cover-icon {
+    width: 30px;
+    height: 30px;
+    object-fit: contain;
+}
+
+.card-edit {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 32px;
+    height: 32px;
+    border-radius: 16px;
+    background-color: @surface-container-highest;
+    align-items: center;
+    justify-content: center;
+}
+
+.card-edit-icon {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+}
+
+.file-title {
+    color: @on-surface;
+    font-size: 14px;
+    font-weight: bold;
+    max-lines: 2;
+    margin-top: 8px;
+}
+
+.file-meta {
+    color: @on-surface-variant;
+    font-size: 10px;
+    margin-top: 2px;
+}
+
+.library-status {
+    width: 100%;
+    flex: 1;
+    justify-content: center;
+    align-items: center;
+}
+
+.status-text {
+    color: @on-surface-variant;
+    font-size: 15px;
+    text-align: center;
+}
+
+/* ============================================================
+   阅读页：几何为分页算法镜像（PaginationConfig），勿动
+   rails = 68 / 76，center 656×254，padding 16 / 12，text 624×230
+   ============================================================ */
+
 .left-rail {
-    width: 64px;
+    width: 68px;
     height: 100vh;
     flex-direction: column;
     align-items: center;
     justify-content: flex-start;
-    padding: 6px 2px;
+    padding: 8px 0;
     background-color: transparent;
 }
 
 .right-rail {
-    width: 72px;
+    width: 76px;
     height: 100vh;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 5px 2px;
+    padding: 5px 0;
     background-color: transparent;
 }
 
 .rail-button {
-    width: 64px;
-    height: 64px;
+    width: 52px;
+    height: 52px;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    margin-top: 3px;
-    margin-bottom: 3px;
-    border-radius: 20px;
+    margin-top: 5px;
+    margin-bottom: 5px;
+    border-radius: 18px;
+    background-color: @surface-container;
+}
+
+.rail-button-accent {
+    width: 52px;
+    height: 52px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin-top: 5px;
+    margin-bottom: 5px;
+    border-radius: 18px;
+    background-color: @primary-container;
 }
 
 .back-button {
     margin-top: 0;
-}
-
-.rail-icon {
-    color: @on-surface;
-    font-size: 31px;
-    line-height: 36px;
-    text-align: center;
 }
 
 .center-content {
@@ -69,89 +319,6 @@
     justify-content: center;
     padding: 10px 8px;
     background-color: @surface;
-}
-
-.home-center {
-    justify-content: center;
-}
-
-.home-heading {
-    flex-direction: row;
-    align-items: baseline;
-    margin-bottom: 10px;
-    padding-left: 4px;
-}
-
-.home-title {
-    color: @on-surface;
-    font-size: 20px;
-    font-weight: bold;
-}
-
-.home-path {
-    color: @on-surface-variant;
-    font-size: 10px;
-    margin-left: 12px;
-}
-
-.shelf-row {
-    width: 640px;
-    height: 166px;
-    flex-direction: row;
-}
-
-.file-card {
-    width: 190px;
-    height: 150px;
-    flex-direction: column;
-    justify-content: space-between;
-    padding: 12px;
-    margin-right: 10px;
-    border-radius: 18px;
-    background-color: @surface-container;
-}
-
-.card-top {
-    width: 100%;
-    height: 26px;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.file-kind {
-    color: @primary;
-    font-size: 20px;
-}
-
-.rename-icon {
-    color: @on-surface-variant;
-    font-size: 20px;
-    padding: 4px 8px;
-}
-
-.file-title {
-    color: @on-surface;
-    font-size: 15px;
-    font-weight: bold;
-    max-lines: 2;
-}
-
-.file-meta {
-    color: @on-surface-variant;
-    font-size: 10px;
-}
-
-.library-status {
-    flex: 1;
-    justify-content: center;
-    align-items: center;
-}
-
-.status-text {
-    color: @on-surface;
-    font-size: 14px;
-    text-align: center;
 }
 
 /* The reading area geometry is mirrored by PaginationConfig:
@@ -179,10 +346,7 @@
     overflow: hidden;
 }
 
-.reader-rail {
-    justify-content: center;
-}
-
+/* 阅读页设置浮层 */
 .settings-mask {
     position: absolute;
     left: 68px;
@@ -191,14 +355,14 @@
     bottom: 0;
     justify-content: flex-end;
     align-items: center;
-    background-color: rgba(0, 0, 0, 0.22);
+    background-color: rgba(0, 0, 0, 0.3);
 }
 
 .settings-panel {
-    width: 300px;
-    padding: 14px;
-    margin-right: 10px;
-    border-radius: 20px;
+    width: 320px;
+    padding: 18px;
+    margin-right: 12px;
+    border-radius: 28px;
     background-color: @surface-container-high;
     flex-direction: column;
 }
@@ -208,44 +372,36 @@
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 10px;
+    margin-bottom: 14px;
 }
 
 .settings-title {
     color: @on-surface;
-    font-size: 16px;
+    font-size: 17px;
     font-weight: bold;
 }
 
-.settings-close,
-.setting-control,
-.dialog-button {
-    width: 48px;
-    height: 44px;
-    border-radius: 14px;
+.settings-close {
+    width: 38px;
+    height: 38px;
+    border-radius: 19px;
     align-items: center;
     justify-content: center;
     background-color: @surface-container-highest;
 }
 
-.settings-control-icon,
-.dialog-button-icon {
-    color: @on-surface;
-    font-size: 24px;
-    text-align: center;
-}
-
 .setting-row {
     width: 100%;
-    height: 54px;
+    height: 58px;
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
 }
 
 .setting-label {
-    color: @on-surface-variant;
+    color: @on-surface;
     font-size: 14px;
+    font-weight: bold;
 }
 
 .setting-stepper {
@@ -253,13 +409,24 @@
     align-items: center;
 }
 
+.setting-control {
+    width: 42px;
+    height: 42px;
+    border-radius: 21px;
+    align-items: center;
+    justify-content: center;
+    background-color: @primary-container;
+}
+
 .setting-value {
-    width: 64px;
+    width: 72px;
     color: @on-surface;
-    font-size: 13px;
+    font-size: 14px;
+    font-weight: bold;
     text-align: center;
 }
 
+/* 重命名对话框 */
 .dialog-mask {
     position: absolute;
     left: 0;
@@ -272,54 +439,128 @@
 }
 
 .rename-dialog {
-    width: 320px;
-    padding: 16px;
-    border-radius: 18px;
+    width: 340px;
+    padding: 20px;
+    border-radius: 28px;
     background-color: @surface-container-high;
     flex-direction: column;
 }
 
 .dialog-title {
     color: @on-surface;
-    font-size: 16px;
-    margin-bottom: 10px;
+    font-size: 17px;
+    font-weight: bold;
+    margin-bottom: 12px;
 }
 
 .rename-input {
     width: 100%;
-    height: 42px;
-    padding: 6px 10px;
+    height: 46px;
+    padding: 6px 14px;
     color: @on-surface;
     font-size: 14px;
-    border-radius: 10px;
+    border-radius: 16px;
     background-color: @surface-container;
 }
 
 .dialog-actions {
     flex-direction: row;
     justify-content: flex-end;
-    margin-top: 12px;
+    margin-top: 14px;
 }
 
 .dialog-button {
-    margin-left: 8px;
+    height: 40px;
+    padding: 0 18px;
+    border-radius: 20px;
+    margin-left: 10px;
+    align-items: center;
+    justify-content: center;
+    background-color: @surface-container-highest;
 }
 
-
-/* Local Material Symbols Sharp SVGs; no font glyph or network dependency. */
-.material-icon {
-    width: 24px;
-    height: 24px;
-    object-fit: contain;
+.dialog-button-primary {
+    height: 40px;
+    padding: 0 18px;
+    border-radius: 20px;
+    margin-left: 10px;
+    align-items: center;
+    justify-content: center;
+    background-color: @primary;
 }
 
-.file-kind-icon {
-    width: 22px;
-    height: 22px;
+.dialog-button-text {
+    color: @on-surface;
+    font-size: 14px;
+    font-weight: bold;
 }
 
-.rename-icon {
-    width: 20px;
-    height: 20px;
-    padding: 4px 8px;
+.dialog-button-text-primary {
+    color: @on-primary;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+/* ============================================================
+   web 预览安全网（预期真机被丢弃）
+   weex-vue-render 在 web 上给所有 div 挂 .weex-ct 基础样式
+   （flex-direction:column / 黑字），按源序覆盖同特异性的单类规则；
+   真机 Weex 引擎只认单类选择器，本段复合选择器会被丢弃——
+   即真机不受影响，构建日志出现 selector 提示属预期。
+   ============================================================ */
+
+.weex-ct .home-title,
+.weex-ct .home-path,
+.weex-ct .segment-text,
+.weex-ct .segment-text-active,
+.weex-ct .file-title,
+.weex-ct .file-meta,
+.weex-ct .status-text,
+.weex-ct .pill-text,
+.weex-ct .pill-text-ghost,
+.weex-ct .reader-text,
+.weex-ct .settings-title,
+.weex-ct .setting-label,
+.weex-ct .setting-value,
+.weex-ct .dialog-title,
+.weex-ct .dialog-button-text,
+.weex-ct .dialog-button-text-primary {
+    color: inherit;
+}
+
+.weex-ct .home-title,
+.weex-ct .reader-text,
+.weex-ct .settings-title,
+.weex-ct .dialog-title {
+    color: @on-surface;
+}
+
+.weex-ct .home-path,
+.weex-ct .file-meta,
+.weex-ct .status-text,
+.weex-ct .setting-label {
+    color: @on-surface-variant;
+}
+
+.weex-ct .segment-text {
+    color: @on-surface-variant;
+}
+
+.weex-ct .segment-text-active {
+    color: @on-primary-container;
+}
+
+.weex-ct .file-title,
+.weex-ct .setting-value,
+.weex-ct .dialog-button-text {
+    color: @on-surface;
+}
+
+.weex-ct .pill-text,
+.weex-ct .dialog-button-text-primary {
+    color: @on-primary;
+}
+
+.weex-ct .pill-text-ghost {
+    color: @on-surface;
 }

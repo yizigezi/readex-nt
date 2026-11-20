@@ -1,15 +1,28 @@
 <template>
-    <div class="home-page">
-        <div class="left-rail">
-            <div class="rail-button back-button" @click="goBack">
-                <image class="material-icon" src="/assets/icons/arrow_back.png" />
-            </div>
-        </div>
-
-        <div class="center-content home-center">
-            <div class="home-heading">
-                <text class="home-title">{{browseMode ? '本地文件' : '最近阅读'}}</text>
+    <div class="home-page" :style="{flexDirection: 'row'}">
+        <div class="home-shell">
+            <div class="home-topbar" :style="{flexDirection: 'row'}">
+                <div class="icon-btn" @click="goBack">
+                    <image class="material-icon" src="/assets/icons/arrow_back.png" />
+                </div>
+                <div class="segment gap-left" :style="{flexDirection: 'row'}">
+                    <div :class="browseMode ? 'segment-item' : 'segment-item-active'" @click="switchRecent">
+                        <text :class="browseMode ? 'segment-text' : 'segment-text-active'">最近</text>
+                    </div>
+                    <div :class="browseMode ? 'segment-item-active' : 'segment-item'" @click="switchBrowse">
+                        <text :class="browseMode ? 'segment-text-active' : 'segment-text'">本地</text>
+                    </div>
+                </div>
                 <text class="home-path" v-if="browseMode">{{currentPath}}</text>
+                <div class="home-top-spacer"></div>
+                <div class="home-top-actions" :style="{flexDirection: 'row'}">
+                    <div class="icon-btn gap-left" v-if="browseMode" @click="goParent">
+                        <image class="material-icon" src="/assets/icons/arrow_upward.png" />
+                    </div>
+                    <div class="icon-btn gap-left" @click="refresh">
+                        <image class="material-icon" src="/assets/icons/refresh.png" />
+                    </div>
+                </div>
             </div>
 
             <div class="library-status" v-if="loading">
@@ -18,23 +31,23 @@
             <div class="library-status" v-else-if="error">
                 <text class="status-text">{{error}}</text>
             </div>
-            <div class="library-status" v-else-if="!browseMode && recentBooks.length === 0">
-                <text class="status-text">还没有最近阅读的书籍</text>
-            </div>
-            <div class="library-status" v-else-if="browseMode && entries.length === 0">
-                <text class="status-text">这个文件夹里没有 TXT 文件</text>
+            <div class="library-status" v-else-if="visibleBooks.length === 0">
+                <text class="status-text">{{browseMode ? '这个文件夹里没有 TXT 文件' : '还没有最近阅读的书籍'}}</text>
             </div>
 
-            <scroller v-else class="shelf-row" scroll-direction="horizontal" show-scrollbar="false">
+            <scroller v-else class="shelf-row" :style="{flexDirection: 'row'}" scroll-direction="horizontal" show-scrollbar="false">
                 <div
                     class="file-card"
                     v-for="entry in visibleBooks"
                     :key="entry.path"
                     @click="openEntry(entry)"
                 >
-                    <div class="card-top">
-                        <image class="material-icon file-kind-icon" :src="entry.isDirectory ? '/assets/icons/folder.png' : '/assets/icons/description.png'" />
-                        <image class="material-icon rename-icon" v-if="!entry.isDirectory" src="/assets/icons/edit.png" @click.stop="startRename(entry)" />
+                    <div :class="entry.isDirectory ? 'card-cover-folder' : 'card-cover'">
+                        <image class="card-cover-icon"
+                            :src="entry.isDirectory ? '/assets/icons/folder.png' : '/assets/icons/description.png'" />
+                    </div>
+                    <div class="card-edit" v-if="!entry.isDirectory" @click.stop="startRename(entry)">
+                        <image class="card-edit-icon" src="/assets/icons/edit.png" />
                     </div>
                     <text class="file-title">{{entry.title || entry.name}}</text>
                     <text class="file-meta" v-if="entry.isDirectory">文件夹</text>
@@ -42,25 +55,17 @@
             </scroller>
         </div>
 
-        <div class="right-rail">
-            <div class="rail-button" @click="toggleBrowse">
-                <image class="material-icon" :src="browseMode ? '/assets/icons/history.png' : '/assets/icons/folder_open.png'" />
-            </div>
-            <div class="rail-button" @click="refresh">
-                <image class="material-icon" src="/assets/icons/refresh.png" />
-            </div>
-            <div class="rail-button" v-if="browseMode" @click="goParent">
-                <image class="material-icon" src="/assets/icons/arrow_upward.png" />
-            </div>
-        </div>
-
         <div class="dialog-mask" v-if="renameVisible">
             <div class="rename-dialog">
                 <text class="dialog-title">设置书名</text>
                 <input class="rename-input" v-model="renameValue" placeholder="输入书名" />
-                <div class="dialog-actions">
-                    <div class="dialog-button" @click="cancelRename"><image class="material-icon" src="/assets/icons/close.png" /></div>
-                    <div class="dialog-button" @click="saveRename"><image class="material-icon" src="/assets/icons/check.png" /></div>
+                <div class="dialog-actions" :style="{flexDirection: 'row'}">
+                    <div class="dialog-button" @click="cancelRename">
+                        <text class="dialog-button-text">取消</text>
+                    </div>
+                    <div class="dialog-button-primary" @click="saveRename">
+                        <text class="dialog-button-text-primary">保存</text>
+                    </div>
                 </div>
             </div>
         </div>
@@ -190,6 +195,12 @@ export default {
             this.browseMode = !this.browseMode
             if (this.browseMode) this.currentPath = DEFAULT_BOOK_DIR
             this.refresh()
+        },
+        switchRecent() {
+            if (this.browseMode) this.toggleBrowse()
+        },
+        switchBrowse() {
+            if (!this.browseMode) this.toggleBrowse()
         },
         goParent() {
             if (this.currentPath === DEFAULT_BOOK_DIR || this.currentPath === '/') return

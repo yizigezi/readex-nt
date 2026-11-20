@@ -7,5 +7,6 @@ export default {
     workflow: 'Build Readex',
     event: 'local',
     builtAt: 'unknown',
+    nativeBuiltAt: 'unknown',
     runUrl: ''
 }

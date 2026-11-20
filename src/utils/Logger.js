@@ -27,6 +27,11 @@ async function appendLine(line) {
     await fs.writeFile(LOG_PATH, next)
 }
 
+/** 等待此前排队的 UI 日志真正写入磁盘。用于调用同步且可能长时间阻塞的原生 API 前。 */
+export async function flushLogs() {
+    await writeQueue
+}
+
 /**
  * 日志写入在后台串行执行，但调用方不应等待文件系统完成。
  * 这样设备上的慢速 fs / execShell 不会阻塞阅读器加载和页面渲染。

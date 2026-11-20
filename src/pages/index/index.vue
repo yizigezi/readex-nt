@@ -50,7 +50,6 @@
                         <image class="card-edit-icon" src="/assets/icons/edit.png" />
                     </div>
                     <text class="file-title">{{entry.title || entry.name}}</text>
-                    <text class="file-meta" v-if="entry.isDirectory">文件夹</text>
                 </div>
             </scroller>
         </div>

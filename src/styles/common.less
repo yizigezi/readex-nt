@@ -97,6 +97,7 @@
     border-radius: 16px;
     align-items: center;
     justify-content: center;
+    margin-right: 4px;
 }
 
 .segment-item-active {
@@ -106,6 +107,7 @@
     align-items: center;
     justify-content: center;
     background-color: @primary-container;
+    margin-right: 4px;
 }
 
 .segment-text {
@@ -146,7 +148,7 @@
 
 .home-path {
     color: @on-surface-variant;
-    font-size: 11px;
+    font-size: 12px;
     margin-left: 12px;
     flex: 1;
     max-width: 330px;
@@ -177,21 +179,20 @@
 }
 
 .file-card {
-    width: 168px;
-    height: 100%;
-    max-height: 168px;
+    width: 156px;
+    height: 152px;
     flex-direction: column;
-    margin-right: 12px;
-    border-radius: 24px;
+    margin-right: 10px;
+    border-radius: 20px;
     background-color: @surface-container;
-    padding: 12px;
-    justify-content: space-between;
+    padding: 10px;
+    justify-content: flex-start;
 }
 
 .card-cover {
     width: 100%;
-    height: 62px;
-    border-radius: 16px;
+    height: 54px;
+    border-radius: 14px;
     background-color: @primary-container;
     align-items: center;
     justify-content: center;
@@ -199,16 +200,16 @@
 
 .card-cover-folder {
     width: 100%;
-    height: 62px;
-    border-radius: 16px;
+    height: 54px;
+    border-radius: 14px;
     background-color: @secondary-container;
     align-items: center;
     justify-content: center;
 }
 
 .card-cover-icon {
-    width: 30px;
-    height: 30px;
+    width: 26px;
+    height: 26px;
     object-fit: contain;
 }
 
@@ -232,10 +233,12 @@
 
 .file-title {
     color: @on-surface;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: bold;
-    max-lines: 2;
+    max-lines: 1;
     margin-top: 8px;
+    text-overflow: ellipsis;
+    max-height: 18px;
 }
 
 .file-meta {

@@ -101,7 +101,7 @@
 <script>
 import { getCurrentBookPath } from '../../utils/BookSession.js'
 import { fs } from '../../utils/FileSystem/FileSystem.js'
-import { logEvent, logError } from '../../utils/Logger.js'
+import { logEvent, logError, flushLogs } from '../../utils/Logger.js'
 import {
     loadSettings,
     saveSettings,
@@ -234,6 +234,8 @@ export default {
                 // "begin" entry is flushed before entering native code so a
                 // hang can be distinguished from later chapter/pagination work.
                 logEvent('reader.loadBook.openBook.begin', 'path=' + path)
+                // openBook 是同步原生调用，可能长时间占用 JS 线程；必须先把 begin 日志落盘。
+                await flushLogs()
                 openedBook = Readex.openBook(path)
                 logEvent('reader.loadBook.openBook.done')
 

@@ -43,6 +43,30 @@
                 </div>
                 <div class="native-debug-info">
                     <div class="native-debug-item">
+                        <text class="native-debug-label">提交版本</text>
+                        <text class="native-debug-value">{{buildInfo.commitShort}}</text>
+                    </div>
+                    <div class="native-debug-item">
+                        <text class="native-debug-label">构建编号</text>
+                        <text class="native-debug-value">{{buildInfo.runNumber}}</text>
+                    </div>
+                    <div class="native-debug-item">
+                        <text class="native-debug-label">构建分支</text>
+                        <text class="native-debug-value">{{buildInfo.branch}}</text>
+                    </div>
+                    <div class="native-debug-item">
+                        <text class="native-debug-label">构建时间</text>
+                        <text class="native-debug-value">{{buildInfo.builtAt}}</text>
+                    </div>
+                    <div class="native-debug-item">
+                        <text class="native-debug-label">构建触发</text>
+                        <text class="native-debug-value">{{buildInfo.event}}</text>
+                    </div>
+                    <div class="native-debug-item">
+                        <text class="native-debug-label">工作流</text>
+                        <text class="native-debug-value">{{buildInfo.workflow}}</text>
+                    </div>
+                    <div class="native-debug-item">
                         <text class="native-debug-label">模块版本</text>
                         <text class="native-debug-value">{{nativeInfo.version || '—'}}</text>
                     </div>
@@ -102,6 +126,7 @@
 import { getCurrentBookPath } from '../../utils/BookSession.js'
 import { fs } from '../../utils/FileSystem/FileSystem.js'
 import { logEvent, logError, flushLogs } from '../../utils/Logger.js'
+import BuildInfo from '../../utils/BuildInfo.js'
 import {
     loadSettings,
     saveSettings,
@@ -165,6 +190,14 @@ export default {
             nativeLogLines: ['等待读取原生日志…'],
             nativeDebugError: '',
             nativeDebugRefreshing: false,
+            buildInfo: {
+                commitShort: BuildInfo.commit ? BuildInfo.commit.slice(0, 12) : '本地构建',
+                runNumber: BuildInfo.runNumber || 'local',
+                branch: BuildInfo.branch || 'unknown',
+                builtAt: BuildInfo.builtAt || 'unknown',
+                event: BuildInfo.event || 'local',
+                workflow: BuildInfo.workflow || '—'
+            },
             loading: false
         }
     },

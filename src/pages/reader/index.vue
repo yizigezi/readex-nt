@@ -59,6 +59,10 @@
                         <text class="native-debug-value">{{buildInfo.builtAt}}</text>
                     </div>
                     <div class="native-debug-item">
+                        <text class="native-debug-label">原生库构建</text>
+                        <text class="native-debug-value">{{buildInfo.nativeBuiltAt}}</text>
+                    </div>
+                    <div class="native-debug-item">
                         <text class="native-debug-label">构建触发</text>
                         <text class="native-debug-value">{{buildInfo.event}}</text>
                     </div>
@@ -195,6 +199,7 @@ export default {
                 runNumber: BuildInfo.runNumber || 'local',
                 branch: BuildInfo.branch || 'unknown',
                 builtAt: BuildInfo.builtAt || 'unknown',
+                nativeBuiltAt: BuildInfo.nativeBuiltAt || 'unknown',
                 event: BuildInfo.event || 'local',
                 workflow: BuildInfo.workflow || '—'
             },

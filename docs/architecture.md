@@ -17,6 +17,7 @@ src/                         Falcon / Vue MiniApp
     Logger.js                UI 诊断日志
     BookLibrary.js           设置、书目、最近阅读与进度持久化
     BookSession.js            页面间当前书籍路径
+    TextOffset.js              UTF-8 字节偏移与 JS 字符串下标游标
     BuildInfo.js              构建元数据（CI 生成，源码含本地回退）
 
 native/                      C++ 核心与 QuickJS 适配

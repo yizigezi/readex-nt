@@ -339,6 +339,10 @@ int init_book_binding(JSContext* ctx)
 JSValue js_open_book(JSContext* ctx, JSValueConst this_val, int argc,
                      JSValueConst* argv)
 {
+    // Log before validation/conversion: this marker proves the QuickJS C
+    // function itself was entered, even if argument handling fails.
+    readex_native_log::write("INFO", "openBook.entry", "QuickJS native binding entered");
+    readex_native_log::write("INFO", "openBook.args", argc > 0 ? js_type_name(argv[0]) : "argc=0");
     (void)this_val;
     READEX_GUARD_BEGIN(ctx)
     if (argc < 1)
@@ -352,22 +356,25 @@ JSValue js_open_book(JSContext* ctx, JSValueConst this_val, int argc,
                                  "实际为 %s",
                                  js_type_name(argv[0]));
 
+    readex_native_log::write("INFO", "openBook.path.convert.begin", "JS_ToCString");
     const char* path_cstr = JS_ToCString(ctx, argv[0]);
-    if (path_cstr == nullptr)
+    if (path_cstr == nullptr) {
+        readex_native_log::write("ERROR", "openBook.path.convert.failed", "JS_ToCString returned null");
         return JS_EXCEPTION; // 已有待处理异常
+    }
     std::string path(path_cstr);
     JS_FreeCString(ctx, path_cstr);
 
     BookHandle* h = new BookHandle{ 0 }; // bad_alloc 走护栏，无资源可泄
 
-    readex_native_log::write("INFO", "book.open.begin", path.c_str());
+    readex_native_log::write("INFO", "openBook.core.begin", path.c_str());
     readex::Result<readex::Book> res = readex::openBook(path);
     if (!res.ok()) {
-        readex_native_log::write("ERROR", "book.open.failed", res.error().toString().c_str());
+        readex_native_log::write("ERROR", "openBook.core.failed", res.error().toString().c_str());
         delete h;
         return JS_Throw(ctx, make_js_error(ctx, res.error()));
     }
-    readex_native_log::write("INFO", "book.open.success", path.c_str());
+    readex_native_log::write("INFO", "openBook.core.success", path.c_str());
     uint32_t id = registry().add(std::move(res.value()));
     if (id == 0) {
         delete h;

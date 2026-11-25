@@ -128,6 +128,7 @@
 
 <script>
 import { getCurrentBookPath } from '../../utils/BookSession.js'
+import { createUtf8OffsetCursor } from '../../utils/TextOffset.js'
 import { fs } from '../../utils/FileSystem/FileSystem.js'
 import { logEvent, logError, flushLogs } from '../../utils/Logger.js'
 import BuildInfo from '../../utils/BuildInfo.js'
@@ -149,22 +150,6 @@ const PADDING_LEFT = 16
 const PADDING_RIGHT = 16
 const PADDING_TOP = 12
 const PADDING_BOTTOM = 12
-
-function byteOffsetToStringIndex(value, byteOffset) {
-    const target = Math.max(0, Number(byteOffset) || 0)
-    let bytes = 0
-    let index = 0
-    while (index < value.length && bytes < target) {
-        const cp = value.codePointAt(index)
-        let byteLength = 1
-        if (cp > 0x7F && cp <= 0x7FF) byteLength = 2
-        else if (cp > 0x7FF && cp <= 0xFFFF) byteLength = 3
-        else if (cp > 0xFFFF) byteLength = 4
-        bytes += byteLength
-        index += cp > 0xFFFF ? 2 : 1
-    }
-    return index
-}
 
 async function loadReadex() {
     const mod = await import('readex')
@@ -354,23 +339,8 @@ export default {
             logEvent('reader.loadChapter.paginate.done', 'pageCount=' + (pages ? pages.length : 0))
             const pageTexts = []
             if (pages && pages.length) {
-                // 页偏移按文本顺序递增；维护一个 UTF-8 字节游标和字符串游标，
-                // 整章最多扫描一次，避免每页从字符串开头重复计算。
-                let stringIndex = 0
-                let byteIndex = 0
-                const advanceTo = targetOffset => {
-                    const target = Math.max(0, Number(targetOffset) || 0)
-                    while (stringIndex < text.length && byteIndex < target) {
-                        const cp = text.codePointAt(stringIndex)
-                        let byteLength = 1
-                        if (cp > 0x7F && cp <= 0x7FF) byteLength = 2
-                        else if (cp > 0x7FF && cp <= 0xFFFF) byteLength = 3
-                        else if (cp > 0xFFFF) byteLength = 4
-                        byteIndex += byteLength
-                        stringIndex += cp > 0xFFFF ? 2 : 1
-                    }
-                    return stringIndex
-                }
+                // 页偏移是 UTF-8 字节偏移；游标按页顺序单向推进，整章只扫描一次。
+                const advanceTo = createUtf8OffsetCursor(text)
                 for (let i = 0; i < pages.length; i++) {
                     const start = advanceTo(pages[i].startOffset)
                     const end = advanceTo(pages[i].endOffset)

@@ -192,7 +192,11 @@ async function nativeFs() {
     try {
         const m = await import('fs');
         const mod = m && (m.default || m);
-        if (mod && typeof mod.readdir === 'function') {
+        // 只接受完整的 Promise/同步兼容接口集合。仅有 readdir 的固件
+        // 模块不能满足 BookLibrary / Logger 的读写需求，必须整体回退。
+        const required = ['readdir', 'stat', 'exists', 'mkdir', 'rm', 'unlink', 'readFile', 'writeFile'];
+        const complete = mod && required.every(name => typeof mod[name] === 'function');
+        if (complete) {
             fsModuleState = mod;
             return mod;
         }

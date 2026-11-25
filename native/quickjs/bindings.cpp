@@ -77,6 +77,7 @@ JSValue js_add(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* ar
 // ---- Readex.info() -> { version, quickjs, platform, buildMode } ----
 JSValue js_info(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* argv)
 {
+    readex_native_log::write("INFO", "api.info.called", "Readex.info invoked by JS");
     (void)this_val;
     (void)argc;
     (void)argv;
@@ -112,6 +113,7 @@ JSValue js_fail(JSContext* ctx, JSValueConst this_val, int argc, JSValueConst* a
 // 组装 default 导出对象（由 module.cpp 收进模块），外部可见、C++ 链接即可。
 JSValue readex_new_api_object(JSContext* ctx)
 {
+    readex_native_log::write("INFO", "api.create.begin", "creating Readex exports");
     try {
         // PR-3：Book 类注册 + 原型（幂等）
         if (::readex_bind::init_book_binding(ctx) != 0)
@@ -132,6 +134,7 @@ JSValue readex_new_api_object(JSContext* ctx)
         JS_SetPropertyStr(ctx, api, "openBook",
                           JS_NewCFunction(ctx, ::readex_bind::js_open_book,
                                           "openBook", 1));
+        readex_native_log::write("INFO", "api.export.openBook", "native function installed on Readex object");
         JS_SetPropertyStr(ctx, api, "closeAllBooks",
                           JS_NewCFunction(ctx, ::readex_bind::js_close_all_books,
                                           "closeAllBooks", 0));
